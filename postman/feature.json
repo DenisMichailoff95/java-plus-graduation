@@ -1,0 +1,1212 @@
+{
+  "info": {
+    "_postman_id": "89b9b9b3-d58d-4378-9fe8-1f5a76ed5551",
+    "name": "Explore With Me - Full Testing",
+    "description": "Полные тесты: пользователи, категории, события, комментарии",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+    "_exporter_id": "44814245",
+    "_collection_link": "https://mytya-8200712.postman.co/workspace/Mytya's-Workspace~efe44e1e-4b9c-4a92-8b3e-b7524147837d/collection/44814245-89b9b9b3-d58d-4378-9fe8-1f5a76ed5551?action=share&source=collection_link&creator=44814245"
+  },
+  "item": [
+    {
+      "name": "👥 1. Создание 3 пользователей (Admin)",
+      "item": [
+        {
+          "name": "1.1 Создать User1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: User1 создан\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID User1\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"user1Id\", jsonData.id);",
+                  "    console.log(\"User1 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Иван Петров\",\n  \"email\": \"ivan@mail.ru\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/users"
+          },
+          "response": []
+        },
+        {
+          "name": "1.2 Создать User2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: User2 создан\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID User2\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"user2Id\", jsonData.id);",
+                  "    console.log(\"User2 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Мария Сидорова\",\n  \"email\": \"maria@mail.ru\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/users"
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 Создать User3",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: User3 создан\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID User3\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"user3Id\", jsonData.id);",
+                  "    console.log(\"User3 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Алексей Козлов\",\n  \"email\": \"alexey@mail.ru\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/users"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📂 2. Создание 2 категорий (Admin)",
+      "item": [
+        {
+          "name": "2.1 Создать Category1 (Концерты)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: Category1 создана\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID Category1\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"category1Id\", jsonData.id);",
+                  "    console.log(\"Category1 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Концерты\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/categories"
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 Создать Category2 (Выставки)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: Category2 создана\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID Category2\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"category2Id\", jsonData.id);",
+                  "    console.log(\"Category2 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Выставки\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/categories"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎪 3. Создание 2 событий разными пользователями",
+      "item": [
+        {
+          "name": "3.1 User1 создает Event1 в Category1 (Концерт)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: Event1 создан\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID Event1\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"event1Id\", jsonData.id);",
+                  "    console.log(\"Event1 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Концерт рок-группы\",\n  \"annotation\": \"Грандиозный концерт известной рок-группы\",\n  \"description\": \"Полное описание концерта с участием специальных гостей\",\n  \"category\": {{category1Id}},\n  \"eventDate\": \"2025-12-25 20:00:00\",\n  \"location\": {\n    \"lat\": 55.7558,\n    \"lon\": 37.6173\n  },\n  \"paid\": true,\n  \"participantLimit\": 1000\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user1Id}}/events"
+          },
+          "response": []
+        },
+        {
+          "name": "3.2 User2 создает Event2 в Category2 (Выставка)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: Event2 создан\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID Event2\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"event2Id\", jsonData.id);",
+                  "    console.log(\"Event2 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Выставка современного искусства\",\n  \"annotation\": \"Уникальная выставка современных художников\",\n  \"description\": \"Более 100 работ известных художников\",\n  \"category\": {{category2Id}},\n  \"eventDate\": \"2025-11-15 10:00:00\",\n  \"location\": {\n    \"lat\": 55.7517,\n    \"lon\": 37.6178\n  },\n  \"paid\": false,\n  \"participantLimit\": 500\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user2Id}}/events"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📝 4. Публикация событий (Admin)",
+      "item": [
+        {
+          "name": "4.1 Опубликовать Event1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Event1 опубликован\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.state).to.equal(\"PUBLISHED\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stateAction\": \"PUBLISH_EVENT\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/events/{{event1Id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "4.2 Опубликовать Event2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Event2 опубликован\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.state).to.equal(\"PUBLISHED\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stateAction\": \"PUBLISH_EVENT\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/events/{{event2Id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💬 5. Тестирование комментариев",
+      "item": [
+        {
+          "name": "5.1 User1 оставляет комментарий к Event2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: Комментарий создан\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID комментария\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"comment1Id\", jsonData.id);",
+                  "    console.log(\"Comment1 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Отличная выставка! Обязательно схожу.\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user1Id}}/events/{{event2Id}}/comments"
+          },
+          "response": []
+        },
+        {
+          "name": "5.2 User2 просматривает комментарии к Event2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Комментарии получены\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var comments = pm.response.json();",
+                  "    pm.expect(comments.length).to.equal(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{event2Id}}/comments?from=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{event2Id}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5.3 User2 оставляет комментарий к Event1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: Комментарий User2 создан\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Сохранить ID комментария User2\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set(\"comment2Id\", jsonData.id);",
+                  "    console.log(\"Comment2 ID: \" + jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Жду не дождусь концерта! Билеты уже куплены!\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user2Id}}/events/{{event1Id}}/comments"
+          },
+          "response": []
+        },
+        {
+          "name": "5.4 User1 редактирует свой комментарий",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Комментарий обновлен\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Отличная выставка! Уточните время работы в выходные.\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user1Id}}/comments/{{comment1Id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "5.5 Админ удаляет комментарий User1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 204: Комментарий удален админом\", function() {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/admin/comments/{{comment1Id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "5.6 Админ запрашивает все комментарии (включая удаленные)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Админ видит все комментарии\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var comments = pm.response.json();",
+                  "    console.log(\"Админ видит комментариев: \" + comments.length);",
+                  "    pm.expect(comments.length).to.be.at.least(1);",
+                  "});",
+                  "pm.test(\"Админ видит удаленный комментарий\", function() {",
+                  "    var comments = pm.response.json();",
+                  "    var deletedComment = comments.find(function(comment) {",
+                  "        return comment.id == pm.variables.get(\"comment1Id\");",
+                  "    });",
+                  "    pm.expect(deletedComment).to.exist;",
+                  "    pm.expect(deletedComment.status).to.equal(\"DELETED\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/comments?eventId={{event2Id}}&from=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "eventId",
+                  "value": "{{event2Id}}"
+                },
+                {
+                  "key": "from",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5.7 User3 просматривает комментарии Event2 (не видит удаленные)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: User3 получает только активные комментарии\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var comments = pm.response.json();",
+                  "    console.log(\"User3 видит комментариев: \" + comments.length);",
+                  "});",
+                  "pm.test(\"User3 не видит удаленный комментарий\", function() {",
+                  "    var comments = pm.response.json();",
+                  "    var deletedComment = comments.find(function(comment) {",
+                  "        return comment.id == pm.variables.get(\"comment1Id\");",
+                  "    });",
+                  "    pm.expect(deletedComment).to.not.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{event2Id}}/comments?from=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{event2Id}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5.8 User3 оставляет комментарий к Event2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 201: Комментарий User3 создан\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Интересная выставка, думаю сходить в выходные\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user3Id}}/events/{{event2Id}}/comments"
+          },
+          "response": []
+        },
+        {
+          "name": "5.9 User2 снова просматривает комментарии Event2 (2 активных)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: User2 видит 1 активный комментарий\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var comments = pm.response.json();",
+                  "    console.log(\"Активных комментариев: \" + comments.length);",
+                  "    pm.expect(comments.length).to.equal(1);",
+                  "});",
+                  "pm.test(\"Проверка, что удаленные комментарии скрыты\", function() {",
+                  "    var comments = pm.response.json();",
+                  "    var hasDeletedComments = comments.some(function(comment) {",
+                  "        return comment.status === \"DELETED\";",
+                  "    });",
+                  "    pm.expect(hasDeletedComments).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{event2Id}}/comments?from=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{event2Id}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5.10 Проверка сортировки комментариев (новые сначала)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Проверка сортировки\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var comments = pm.response.json();",
+                  "});",
+                  "pm.test(\"Комментарии отсортированы от новых к старым\", function() {",
+                  "    var comments = pm.response.json();",
+                  "    if (comments.length > 1) {",
+                  "        for (var i = 0; i < comments.length - 1; i++) {",
+                  "            var currentDate = new Date(comments[i].createdAt);",
+                  "            var nextDate = new Date(comments[i + 1].createdAt);",
+                  "            pm.expect(currentDate.getTime()).to.be.greaterThan(nextDate.getTime(),",
+                  "                \"Комментарий \" + i + \" должен быть новее комментария \" + (i + 1));",
+                  "        }",
+                  "        console.log(\"Сортировка верная: новые комментарии first\");",
+                  "    } else {",
+                  "        console.log(\"Недостаточно комментариев для проверки сортировки\");",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{event2Id}}/comments?from=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{event2Id}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔐 7. Тесты безопасности и ошибок",
+      "item": [
+        {
+          "name": "7.1 User2 пытается редактировать чужой комментарий (User1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 403: Запрещено редактировать чужой комментарий\", function() {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test(\"Проверка сообщения об ошибке\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include(\"Редактировать можно только свои комментарии\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Попытка редактирования чужого комментария\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user2Id}}/comments/{{comment1Id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "7.2 User1 пытается удалить чужой комментарий (User2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 403: Запрещено удалять чужой комментарий\", function() {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/users/{{user1Id}}/comments/{{comment2Id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⚡ 8. Тесты валидации",
+      "item": [
+        {
+          "name": "8.1 Создание комментария с пустым текстом",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 400: Пустой текст недопустим\", function() {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user1Id}}/events/{{event1Id}}/comments"
+          },
+          "response": []
+        },
+        {
+          "name": "8.2 Создание комментария с слишком длинным текстом (>2000 символов)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Генерируем строку из 2005 символов и устанавливаем тело запроса",
+                  "const longText = 'A'.repeat(2005);",
+                  "pm.request.body.raw = JSON.stringify({ text: longText });"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 400: Текст превышает лимит\", function() {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"temp\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user1Id}}/events/{{event1Id}}/comments"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🚫 9. Тесты бизнес-правил",
+      "item": [
+        {
+          "name": "9.1 Попытка создать комментарий к несуществующему событию",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 404: Событие не найдено\", function() {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Комментарий к несуществующему событию\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user1Id}}/events/99999/comments"
+          },
+          "response": []
+        },
+        {
+          "name": "9.2 Попытка отредактировать удаленный комментарий",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 409: Нельзя редактировать удаленный комментарий\", function() {",
+                  "    pm.response.to.have.status(409);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Попытка редактирования удаленного комментария\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{user1Id}}/comments/{{comment1Id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📋 10. Дополнительные endpoint'ы",
+      "item": [
+        {
+          "name": "10.1 Получить конкретный комментарий (Public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Комментарий получен\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Проверить структуру комментария\", function() {",
+                  "    var comment = pm.response.json();",
+                  "    pm.expect(comment).to.have.property('id');",
+                  "    pm.expect(comment).to.have.property('text');",
+                  "    pm.expect(comment).to.have.property('author');",
+                  "    pm.expect(comment).to.have.property('createdAt');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/{{event1Id}}/comments/{{comment2Id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "10.2 User1 просматривает свои комментарии",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Комментарии пользователя получены\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Проверить, что видны только комментарии User1\", function() {",
+                  "    var comments = pm.response.json();",
+                  "    comments.forEach(function(comment) {",
+                  "        pm.expect(comment.author.id).to.equal(pm.variables.get(\"user1Id\"));",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{user1Id}}/comments?from=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{user1Id}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.3 Админ фильтрует комментарии по пользователям",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Фильтрация по пользователям\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Проверить фильтрацию по User1\", function() {",
+                  "    var comments = pm.response.json();",
+                  "    comments.forEach(function(comment) {",
+                  "        pm.expect(comment.author.id).to.equal(pm.variables.get(\"user1Id\"));",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/comments?users={{user1Id}}&from=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "users",
+                  "value": "{{user1Id}}"
+                },
+                {
+                  "key": "from",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "✅ 6. Финальная проверка",
+      "item": [
+        {
+          "name": "6.3 Проверка комментариев Event2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Статус 200: Комментарии проверены\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var comments = pm.response.json();",
+                  "    console.log(\"Количество комментариев: \" + comments.length);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{event2Id}}/comments?from=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{event2Id}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "user1Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user2Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user3Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "category1Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "category2Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "event1Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "event2Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "comment1Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "comment2Id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
