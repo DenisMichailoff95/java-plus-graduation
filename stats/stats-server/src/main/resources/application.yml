@@ -1,13 +1,5 @@
 server:
   port: 0  # Случайный порт согласно требованиям
-  servlet:
-    encoding:
-      charset: UTF-8
-      enabled: true
-      force: true
-  tomcat:
-    max-threads: 200
-    min-spare-threads: 10
 
 spring:
   sql:
@@ -15,28 +7,21 @@ spring:
       mode: always
       schema-locations: classpath:schema.sql
   application:
-    name: main-service
+    name: stats-server
   config:
-    import: optional:configserver:http://localhost:8888  # optional: для возможности запуска без config-server
+    import: optional:configserver:http://localhost:8888
   cloud:
     config:
-      enabled: false  # Отключаем config client для упрощения запуска
-      discovery:
-        enabled: false  # Отключаем discovery для config server
+      enabled: false
   datasource:
-    url: jdbc:postgresql://localhost:5432/ewm
-    username: ewm
-    password: ewm
+    url: jdbc:postgresql://localhost:5433/stats
+    username: test
+    password: test
     hikari:
       connection-timeout: 30000
-      maximum-pool-size: 10
-      minimum-idle: 5
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      connection-test-query: SELECT 1
+      maximum-pool-size: 8
+      minimum-idle: 3
   jpa:
-    open-in-view: false
-    show-sql: false
     hibernate:
       ddl-auto: validate
     properties:
@@ -49,8 +34,6 @@ spring:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: UTC
     default-property-inclusion: always
-    deserialization:
-      fail-on-unknown-properties: false
 
 management:
   endpoints:
@@ -63,21 +46,16 @@ management:
 
 eureka:
   client:
-    enabled: false  # Отключаем Eureka для упрощения запуска
+    enabled: true  # Включаем Eureka для stats-server
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
+  instance:
+    preferIpAddress: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
 
-# Настройки для локального запуска
 logging:
   level:
     ru.practicum: INFO
     org.springframework: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-
-# Кастомные настройки приложения для локального запуска
-app:
-  stats:
-    enabled: true
-    server:
-      url: http://localhost:9090  # Локальный адрес stats-server
