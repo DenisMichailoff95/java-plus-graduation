@@ -6,7 +6,6 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema.sql
-      continue-on-error: true
   application:
     name: stats-server
   config:
