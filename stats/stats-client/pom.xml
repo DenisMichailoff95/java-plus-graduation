@@ -13,11 +13,12 @@
     <version>0.0.1-SNAPSHOT</version>
     <name>stats-client</name>
     <description>stats-client</description>
-    <packaging>jar</packaging> <!-- ЯВНО УКАЗАТЬ JAR -->
+    <packaging>jar</packaging>
 
     <properties>
         <java.version>21</java.version>
     </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -47,6 +48,16 @@
         </dependency>
 
         <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-commons</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
@@ -55,7 +66,6 @@
 
     <build>
         <plugins>
-            <!-- УБРАТЬ spring-boot-maven-plugin для библиотечных модулей -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

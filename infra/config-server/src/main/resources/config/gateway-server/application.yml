@@ -1,0 +1,88 @@
+server:
+  port: 8080  # Фиксированный порт для gateway-server
+
+spring:
+  application:
+    name: gateway-server
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true  # Включаем динамическое обнаружение сервисов через Eureka
+          lower-case-service-id: true
+      routes:
+        - id: main-service
+          uri: lb://MAIN-SERVICE
+          predicates:
+            - Path=/admin/**,/users/**,/events/**,/categories/**,/compilations/**,/comments/**
+          filters:
+            - StripPrefix=0
+        - id: stats-service
+          uri: lb://STATS-SERVER
+          predicates:
+            - Path=/stats/**,/hit/**
+          filters:
+            - StripPrefix=0
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 10000
+      metrics:
+        enabled: true
+    loadbalancer:
+      health-check:
+        interval: 30s
+        initial-delay: 1s
+
+# Настройки для работы с случайными портами сервисов
+eureka:
+  client:
+    enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    registry-fetch-interval-seconds: 5  # Чаще обновляем реестр для динамических портов
+  instance:
+    prefer-ip-address: false
+    instance-id: ${spring.application.name}:${server.port}
+    lease-renewal-interval-in-seconds: 10  # Быстрее обновляем статус
+    lease-expiration-duration-in-seconds: 30
+
+# Настройки Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,routes
+      base-path: /actuator
+  endpoint:
+    gateway:
+      enabled: true
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: false
+
+# Настройки логирования
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    reactor.netty.http.client: INFO
+    ru.practicum: INFO
+    org.springframework.cloud.loadbalancer: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %-40.40logger{39} : %msg%n"
+  file:
+    name: logs/gateway-server.log
+    max-size: 10MB
+    max-history: 10
+
+# Кастомные настройки
+app:
+  gateway:
+    cors:
+      allowed-origins: "*"
+      allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+      allowed-headers: "*"
+      allow-credentials: true
+      max-age: 3600

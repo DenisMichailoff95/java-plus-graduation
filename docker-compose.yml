@@ -1,48 +1,92 @@
+version: '3.8'
+
 services:
-  stats-server:
-    build: stats
-    image: stats_image
-    container_name: stats
-    ports:
-      - "9090:9090"
-    depends_on:
-      - stats-db
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stats
-      - SPRING_DATASOURCE_USERNAME=test
-      - SPRING_DATASOURCE_PASSWORD=test
-
-  stats-db:
-    image: postgres:16.1
-    ports:
-      - "5433:5432"
-    container_name: stats-postgres
-    environment:
-      - POSTGRES_PASSWORD=test
-      - POSTGRES_USER=test
-      - POSTGRES_DB=stats
-
-  ewm-service:
-    build: main-service
-    image: with_me_plus-ewm
-    container_name: with_me_plus-ewm
-    ports:
-      - "8080:8080"
-    depends_on:
-      - ewm-db
-      - stats-server
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://ewm-db:5432/ewm
-      - SPRING_DATASOURCE_USERNAME=ewm
-      - SPRING_DATASOURCE_PASSWORD=ewm
-      - STATS_SERVER_URL=http://stats-server:9090
-
   ewm-db:
-    image: postgres:16.1
+    image: postgres:16.1-alpine  # Используем alpine для меньшего размера
+    container_name: ewm-postgres
     ports:
       - "5432:5432"
-    container_name: ewm-postgres
     environment:
       - POSTGRES_PASSWORD=ewm
       - POSTGRES_USER=ewm
       - POSTGRES_DB=ewm
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C  # Явно задаём кодировку
+    volumes:
+      - postgres_ewm_data:/var/lib/postgresql/data
+      - ./core/main-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro  # Автоматическое создание схемы
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ewm -d ewm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - ewm-network
+    labels:
+      - "com.practicum.service=database"
+      - "com.practicum.project=explore-with-me"
+
+  stats-db:
+    image: postgres:16.1-alpine  # Используем alpine для меньшего размера
+    container_name: stats-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_USER=test
+      - POSTGRES_DB=stats
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C  # Явно задаём кодировку
+    volumes:
+      - postgres_stats_data:/var/lib/postgresql/data
+      - ./stats/stats-server/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro  # Автоматическое создание схемы
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - ewm-network
+    labels:
+      - "com.practicum.service=database"
+      - "com.practicum.project=explore-with-me"
+
+volumes:
+  postgres_ewm_data:
+    name: ewm-postgres-data
+    labels:
+      - "com.practicum.service=database"
+      - "com.practicum.project=explore-with-me"
+  postgres_stats_data:
+    name: stats-postgres-data
+    labels:
+      - "com.practicum.service=database"
+      - "com.practicum.project=explore-with-me"
+
+networks:
+  ewm-network:
+    name: ewm-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    labels:
+      - "com.practicum.project=explore-with-me"

@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS hits (
     timestamp TIMESTAMP WITHOUT TIME ZONE NOT NULL
 );
 
--- Индексы для оптимизации запросов статистики
 CREATE INDEX IF NOT EXISTS idx_hits_timestamp ON hits(timestamp);
 CREATE INDEX IF NOT EXISTS idx_hits_uri ON hits(uri);
 CREATE INDEX IF NOT EXISTS idx_hits_app ON hits(app);
