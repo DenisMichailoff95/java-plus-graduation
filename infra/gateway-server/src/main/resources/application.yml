@@ -3,7 +3,7 @@ server:
   compression:
     enabled: true
   netty:
-    connection-timeout: 30s
+    connection-timeout: 30000  # Изменить с 30s на 30000 (миллисекунды)
 
 spring:
   application:
@@ -49,8 +49,8 @@ spring:
                 methods: GET,POST,PUT,PATCH,DELETE
                 exceptions: java.io.IOException,org.springframework.cloud.gateway.support.NotFoundException
                 backoff:
-                  firstBackoff: 100ms
-                  maxBackoff: 1s
+                  firstBackoff: 100
+                  maxBackoff: 1000
                   factor: 2
                   basedOnPreviousValue: false
         - id: stats-service
@@ -65,76 +65,9 @@ spring:
                 fallbackUri: forward:/fallback/stats
       httpclient:
         connect-timeout: 5000
-        response-timeout: 10s
+        response-timeout: 10000  # Изменить с 10s на 10000
         pool:
           type: elastic
-          max-idle-time: 60s
+          max-idle-time: 60000  # Изменить с 60s на 60000
           max-connections: 1000
-          acquire-timeout: 45s
-
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
-    healthcheck:
-      enabled: true
-    fetch-registry: true
-    register-with-eureka: true
-    registry-fetch-interval-seconds: 10
-  instance:
-    preferIpAddress: true
-    instance-id: ${spring.application.name}:${server.port}
-    lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 30
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,gateway,routes,metrics,prometheus
-      base-path: /manage
-  endpoint:
-    health:
-      show-details: always
-    gateway:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
-
-resilience4j:
-  circuitbreaker:
-    instances:
-      mainService:
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 5s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
-      statsService:
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 10s
-        failureRateThreshold: 50
-  timelimiter:
-    instances:
-      mainService:
-        timeoutDuration: 3s
-      statsService:
-        timeoutDuration: 5s
-
-logging:
-  level:
-    org.springframework.cloud.gateway: DEBUG
-    reactor.netty: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-  file:
-    name: logs/gateway-server.log
-    max-size: 10MB
-    max-history: 30
+          acquire-timeout: 45000  # Изменить с 45s на 45000
