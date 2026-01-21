@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.5</version>
+        <version>3.4.6</version> <!-- Обновлено до последней стабильной версии -->
         <relativePath/>
     </parent>
 
@@ -20,7 +20,11 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding> <!-- Добавлено -->
         <spring-cloud.version>2024.0.0</spring-cloud.version>
+        <lombok.version>1.18.38</lombok.version> <!-- Явно указана версия Lombok -->
+        <mapstruct.version>1.6.3</mapstruct.version> <!-- Явно указана версия MapStruct -->
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version> <!-- Версия компилятора -->
     </properties>
 
     <modules>
@@ -38,12 +42,50 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Явное управление версиями общих зависимостей -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+                <scope>provided</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <build>
         <pluginManagement>
             <plugins>
+                <!-- Базовые настройки компилятора -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.plugin.version}</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                        <parameters>true</parameters>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
@@ -51,17 +93,19 @@
                         <systemPropertyVariables>
                             <spring.profiles.active>test</spring.profiles.active>
                         </systemPropertyVariables>
+                        <argLine>-Dfile.encoding=${project.build.sourceEncoding}</argLine> <!-- Добавлено -->
                     </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-checkstyle-plugin</artifactId>
-                    <version>3.1.2</version>
+                    <version>3.3.1</version> <!-- Обновлено до последней стабильной -->
                     <configuration>
                         <configLocation>checkstyle.xml</configLocation>
                         <failOnViolation>true</failOnViolation>
                         <logViolationsToConsole>true</logViolationsToConsole>
                         <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                        <encoding>${project.build.sourceEncoding}</encoding> <!-- Добавлено -->
                     </configuration>
                     <executions>
                         <execution>
@@ -75,17 +119,18 @@
                         <dependency>
                             <groupId>com.puppycrawl.tools</groupId>
                             <artifactId>checkstyle</artifactId>
-                            <version>10.3</version>
+                            <version>10.18.2</version> <!-- Обновлено до последней стабильной -->
                         </dependency>
                     </dependencies>
                 </plugin>
                 <plugin>
                     <groupId>com.github.spotbugs</groupId>
                     <artifactId>spotbugs-maven-plugin</artifactId>
-                    <version>4.8.5.0</version>
+                    <version>4.8.6.0</version> <!-- Обновлено до последней стабильной -->
                     <configuration>
                         <effort>Max</effort>
                         <threshold>High</threshold>
+                        <encoding>${project.build.sourceEncoding}</encoding> <!-- Добавлено -->
                     </configuration>
                     <executions>
                         <execution>
@@ -101,6 +146,12 @@
                     <version>0.8.12</version>
                     <configuration>
                         <output>file</output>
+                        <excludes>
+                            <!-- Исключаем DTO и модели из покрытия -->
+                            <exclude>**/dto/**</exclude>
+                            <exclude>**/model/**</exclude>
+                            <exclude>**/entity/**</exclude>
+                        </excludes>
                     </configuration>
                     <executions>
                         <execution>
@@ -122,32 +173,32 @@
                                             <limit>
                                                 <counter>INSTRUCTION</counter>
                                                 <value>COVEREDRATIO</value>
-                                                <minimum>0.01</minimum>
+                                                <minimum>0.70</minimum> <!-- Повышено с 0.01 -->
                                             </limit>
                                             <limit>
                                                 <counter>LINE</counter>
                                                 <value>COVEREDRATIO</value>
-                                                <minimum>0.2</minimum>
+                                                <minimum>0.70</minimum> <!-- Повышено с 0.2 -->
                                             </limit>
                                             <limit>
                                                 <counter>BRANCH</counter>
                                                 <value>COVEREDRATIO</value>
-                                                <minimum>0.2</minimum>
+                                                <minimum>0.50</minimum> <!-- Повышено с 0.2 -->
                                             </limit>
                                             <limit>
                                                 <counter>COMPLEXITY</counter>
                                                 <value>COVEREDRATIO</value>
-                                                <minimum>0.2</minimum>
+                                                <minimum>0.60</minimum> <!-- Повышено с 0.2 -->
                                             </limit>
                                             <limit>
                                                 <counter>METHOD</counter>
                                                 <value>COVEREDRATIO</value>
-                                                <minimum>0.2</minimum>
+                                                <minimum>0.70</minimum> <!-- Повышено с 0.2 -->
                                             </limit>
                                             <limit>
                                                 <counter>CLASS</counter>
                                                 <value>MISSEDCOUNT</value>
-                                                <maximum>1</maximum>
+                                                <maximum>3</maximum> <!-- Увеличено с 1 для гибкости -->
                                             </limit>
                                         </limits>
                                     </rule>
@@ -163,9 +214,24 @@
                         </execution>
                     </executions>
                 </plugin>
+                <!-- Плагин для создания исходников -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>3.3.1</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
             </plugins>
         </pluginManagement>
     </build>
+
     <profiles>
         <profile>
             <id>check</id>
@@ -194,6 +260,27 @@
             <id>coverage</id>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- Профиль для полной сборки с тестами -->
+        <profile>
+            <id>full-build</id>
+            <activation>
+                <property>
+                    <name>!skipTests</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                    </plugin>
                     <plugin>
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
