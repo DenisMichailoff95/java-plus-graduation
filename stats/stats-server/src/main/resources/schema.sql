@@ -28,8 +28,9 @@ CREATE INDEX IF NOT EXISTS idx_hits_app_timestamp ON hits(app, timestamp);
 CREATE INDEX IF NOT EXISTS idx_hits_uri_timestamp ON hits(uri, timestamp DESC);
 
 -- Частичный индекс для актуальных данных (последние 30 дней)
-CREATE INDEX IF NOT EXISTS idx_hits_recent ON hits(timestamp DESC)
-    WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL '30 days';
+-- ЗАМЕНИТЬ на простой индекс без условия WHERE с CURRENT_TIMESTAMP
+-- Вместо этого можно использовать обычный индекс и фильтровать в запросах
+CREATE INDEX IF NOT EXISTS idx_hits_timestamp_desc ON hits(timestamp DESC);
 
 -- Индекс для уникальных подсчетов
 CREATE INDEX IF NOT EXISTS idx_hits_app_uri_ip ON hits(app, uri, ip);
@@ -128,12 +129,6 @@ VALUES (
 RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
--- Создание триггера (опционально, можно включать для больших нагрузок)
--- CREATE TRIGGER trigger_update_aggregated_stats
--- AFTER INSERT ON hits
--- FOR EACH ROW
--- EXECUTE FUNCTION update_aggregated_stats();
 
 -- Функция для очистки старых данных
 CREATE OR REPLACE FUNCTION cleanup_old_hits(retention_days INTEGER DEFAULT 365)
