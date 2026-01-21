@@ -26,8 +26,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
-import static ru.practicum.mainservice.participation.model.RequestStatus.CANCELED;
-import static ru.practicum.mainservice.participation.model.RequestStatus.CONFIRMED;
+import static ru.practicum.mainservice.participation.model.RequestStatus.*;
 
 @Slf4j
 @Service
@@ -39,12 +38,16 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     private final EventRepository eventRepo;
     private final ParticipationRequestRepository requestRepo;
 
+    @Override
     @Transactional
     public ParticipationRequestDto createRequest(Long userId, Long eventId) {
-        log.info("Пользователь {} пытается создать запрос участия для события {}", userId, eventId);
+        log.info("Creating participation request: userId={}, eventId={}", userId, eventId);
 
         User user = getUserById(userId);
         Event event = getEventById(eventId);
+
+        log.debug("Event found: id={}, title={}, participantLimit={}, requestModeration={}",
+                event.getId(), event.getTitle(), event.getParticipantLimit(), event.getRequestModeration());
 
         checkRequestNotExists(userId, eventId);
         checkNotEventInitiator(userId, event);
@@ -52,48 +55,77 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
         checkParticipantLimit(event, eventId);
 
         RequestStatus status = determineRequestStatus(event);
+        log.debug("Determined request status: {}", status);
 
         ParticipationRequest request = new ParticipationRequest();
         request.setRequester(user);
         request.setEvent(event);
         request.setCreated(LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS));
         request.setStatus(status);
-        log.info("Создана заявка от пользователя {} на событие {} со статусом {}", userId, eventId, status);
-        return ParticipationRequestMapper.toDto(requestRepo.save(request));
+
+        ParticipationRequest saved = requestRepo.save(request);
+        log.info("Participation request created: id={}, userId={}, eventId={}, status={}",
+                saved.getId(), userId, eventId, status);
+
+        return ParticipationRequestMapper.toDto(saved);
     }
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
+        log.debug("Getting requests for user: {}", userId);
+
         if (!userRepo.existsById(userId)) {
             throw new NotFoundException("User", userId);
         }
-        return requestRepo.findAllByRequesterId(userId).stream()
+
+        List<ParticipationRequest> requests = requestRepo.findAllByRequesterId(userId);
+        log.debug("Found {} requests for user: {}", requests.size(), userId);
+
+        return requests.stream()
                 .map(ParticipationRequestMapper::toDto)
                 .toList();
     }
 
+    @Override
     @Transactional
     public EventRequestStatusUpdateResult updateRequestStatuses(Long userId, Long eventId,
                                                                 EventRequestStatusUpdateRequest request) {
+        log.info("Updating request statuses: userId={}, eventId={}, status={}, requestIds={}",
+                userId, eventId, request.getStatus(), request.getRequestIds());
+
         Event event = getEventWithCheck(userId, eventId);
         List<ParticipationRequest> requests = getPendingRequestsOrThrow(request.getRequestIds());
-        return switch (request.getStatus()) {
-            case "CONFIRMED" -> confirmRequests(event, requests);
-            case "REJECTED" -> rejectRequests(requests);
-            default -> throw new IllegalArgumentException("Неправильный статус: " + request.getStatus());
-        };
+
+        EventRequestStatusUpdateResult result;
+        if ("CONFIRMED".equals(request.getStatus())) {
+            result = confirmRequests(event, requests);
+        } else if ("REJECTED".equals(request.getStatus())) {
+            result = rejectRequests(requests);
+        } else {
+            throw new IllegalArgumentException("Invalid status: " + request.getStatus());
+        }
+
+        log.info("Request statuses updated: confirmed={}, rejected={}",
+                result.getConfirmedRequests().size(), result.getRejectedRequests().size());
+
+        return result;
     }
 
     @Override
     public List<ParticipationRequestDto> getRequestsForEvent(Long eventId, Long initiatorId) {
-        log.debug("getRequestsForEvent: {} of user: {}", eventId, initiatorId);
+        log.debug("Getting requests for event: {} by initiator: {}", eventId, initiatorId);
+
         getUserById(initiatorId);
         Event event = getEventById(eventId);
+
         if (!event.getInitiator().getId().equals(initiatorId)) {
-            throw new NoAccessException("Только инициатор может просматривать запросы на проведение мероприятия");
+            throw new NoAccessException("Only event initiator can view participation requests");
         }
-        List<ParticipationRequest> allByEventId = requestRepo.findAllByEventId(eventId);
-        return allByEventId.stream()
+
+        List<ParticipationRequest> requests = requestRepo.findAllByEventId(eventId);
+        log.debug("Found {} requests for event: {}", requests.size(), eventId);
+
+        return requests.stream()
                 .map(ParticipationRequestMapper::toDto)
                 .toList();
     }
@@ -101,15 +133,27 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     @Override
     @Transactional
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
-        log.info("Пользователь {} отменяет заявку с ID {}", userId, requestId);
+        log.info("Canceling request: userId={}, requestId={}", userId, requestId);
+
         ParticipationRequest request = requestRepo.findById(requestId)
                 .orElseThrow(() -> new NotFoundException("ParticipationRequest", requestId));
+
         if (!request.getRequester().getId().equals(userId)) {
-            throw new ForbiddenException("Отменить его может только автор заявки.");
+            throw new ForbiddenException("Only request creator can cancel the request");
         }
+
+        if (request.getStatus() == CANCELED) {
+            throw new ConditionNotMetException("Request is already canceled");
+        }
+
         request.setStatus(CANCELED);
-        return ParticipationRequestMapper.toDto(requestRepo.save(request));
+        ParticipationRequest saved = requestRepo.save(request);
+
+        log.info("Request canceled: id={}, userId={}", saved.getId(), userId);
+        return ParticipationRequestMapper.toDto(saved);
     }
+
+    // Private helper methods
 
     private User getUserById(Long userId) {
         return userRepo.findById(userId)
@@ -123,114 +167,114 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
 
     private void checkRequestNotExists(Long userId, Long eventId) {
         if (requestRepo.existsByRequesterIdAndEventId(userId, eventId)) {
-            throw new ConditionNotMetException("Заявка на участие уже отправлена.");
+            throw new ConditionNotMetException("Participation request already exists");
         }
     }
 
     private void checkNotEventInitiator(Long userId, Event event) {
         if (event.getInitiator().getId().equals(userId)) {
-            throw new ConditionNotMetException("Заявка на участие уже отправлена.");
+            throw new ConditionNotMetException("Event initiator cannot create participation request");
         }
     }
 
     private void checkEventIsPublished(Event event) {
-        if (!event.getState().equals(EventState.PUBLISHED)) {
-            throw new ConditionNotMetException("Невозможно принять участие в неопубликованном мероприятии.");
+        if (!EventState.PUBLISHED.equals(event.getState())) {
+            throw new ConditionNotMetException("Cannot participate in unpublished event");
         }
     }
 
     private void checkParticipantLimit(Event event, Long eventId) {
-        int confirmed = requestRepo.countByEventIdAndStatus(eventId, CONFIRMED);
+        if (event.getParticipantLimit() != null && event.getParticipantLimit() > 0) {
+            int confirmed = requestRepo.countByEventIdAndStatus(eventId, CONFIRMED);
 
-        // Проверяем participantLimit, а не participant_limit
-        if (event.getParticipantLimit() != null && event.getParticipantLimit() > 0
-                && confirmed >= event.getParticipantLimit()) {
-            throw new ConditionNotMetException("Лимит участников мероприятия достигнут.");
+            if (confirmed >= event.getParticipantLimit()) {
+                throw new ConditionNotMetException("Participant limit reached");
+            }
         }
     }
 
     private RequestStatus determineRequestStatus(Event event) {
-        // Проверяем participantLimit, а не participant_limit
-        if (event.getParticipantLimit() == null || event.getParticipantLimit() == 0
-                || Boolean.FALSE.equals(event.getRequestModeration())) {
-            return RequestStatus.CONFIRMED;
+        // Если лимит 0 или модерация отключена - сразу подтверждаем
+        if (event.getParticipantLimit() != null && event.getParticipantLimit() == 0) {
+            return CONFIRMED;
         }
-        return RequestStatus.PENDING;
+
+        if (Boolean.FALSE.equals(event.getRequestModeration())) {
+            return CONFIRMED;
+        }
+
+        return PENDING;
     }
 
     private Event getEventWithCheck(Long userId, Long eventId) {
         Event event = eventRepo.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event", eventId));
+
         if (!event.getInitiator().getId().equals(userId)) {
-            throw new ForbiddenException("Пользователь не является инициатором события");
+            throw new ForbiddenException("User is not the event initiator");
         }
+
         if (!EventState.PUBLISHED.equals(event.getState())) {
-            throw new ConditionNotMetException("Мероприятие должно быть опубликовано");
+            throw new ConditionNotMetException("Event must be published");
         }
+
         return event;
     }
 
     private List<ParticipationRequest> getPendingRequestsOrThrow(List<Long> requestIds) {
         List<ParticipationRequest> requests = requestRepo.findAllById(requestIds);
-        boolean hasNonPending = requests.stream()
-                .anyMatch(r -> r.getStatus() != RequestStatus.PENDING);
-        if (hasNonPending) {
-            throw new ConditionNotMetException("Запрос должен иметь статус ОЖИДАЮЩИЙ");
+
+        if (requests.size() != requestIds.size()) {
+            // Создаем исключение с сообщением, а не с id
+            throw new NotFoundException("Some participation requests not found", -1L);
         }
+
+        boolean hasNonPending = requests.stream()
+                .anyMatch(r -> r.getStatus() != PENDING);
+
+        if (hasNonPending) {
+            throw new ConditionNotMetException("All requests must be PENDING");
+        }
+
         return requests;
     }
 
     private EventRequestStatusUpdateResult confirmRequests(Event event, List<ParticipationRequest> requests) {
-        checkIfLimitAvailableOrThrow(event);
-        int limit = event.getParticipantLimit();
-        long confirmedCount = requestRepo.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-        int available = limit - (int) confirmedCount;
+        int limit = event.getParticipantLimit() != null ? event.getParticipantLimit() : 0;
+        int confirmedCount = requestRepo.countByEventIdAndStatus(event.getId(), CONFIRMED);
+        int available = limit == 0 ? Integer.MAX_VALUE : limit - confirmedCount;
+
         List<ParticipationRequest> confirmed = new ArrayList<>();
         List<ParticipationRequest> rejected = new ArrayList<>();
+
         for (ParticipationRequest request : requests) {
-            if (shouldAutoConfirm(event)) {
-                confirmRequest(request, confirmed);
-            } else if (available > 0) {
-                confirmRequest(request, confirmed);
-                available--;
+            if (available > 0) {
+                request.setStatus(CONFIRMED);
+                confirmed.add(request);
+                if (limit > 0) {
+                    available--;
+                }
             } else {
-                rejectRequest(request, rejected);
+                request.setStatus(REJECTED);
+                rejected.add(request);
             }
         }
+
         requestRepo.saveAll(requests);
+
         return new EventRequestStatusUpdateResult(
                 confirmed.stream().map(ParticipationRequestMapper::toDto).toList(),
                 rejected.stream().map(ParticipationRequestMapper::toDto).toList()
         );
     }
 
-    private void checkIfLimitAvailableOrThrow(Event event) {
-        int limit = event.getParticipantLimit();
-        long confirmedCount = requestRepo.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-        if (limit != 0 && Boolean.TRUE.equals(event.getRequestModeration()) && confirmedCount >= limit) {
-            throw new ConditionNotMetException("Лимит участников мероприятия достигнет");
-        }
-    }
-
-    private boolean shouldAutoConfirm(Event event) {
-        return event.getParticipantLimit() == 0 || Boolean.FALSE.equals(event.getRequestModeration());
-    }
-
-    private void confirmRequest(ParticipationRequest request, List<ParticipationRequest> confirmed) {
-        request.setStatus(RequestStatus.CONFIRMED);
-        confirmed.add(request);
-    }
-
-    private void rejectRequest(ParticipationRequest request, List<ParticipationRequest> rejected) {
-        request.setStatus(RequestStatus.REJECTED);
-        rejected.add(request);
-    }
-
     private EventRequestStatusUpdateResult rejectRequests(List<ParticipationRequest> requests) {
         for (ParticipationRequest r : requests) {
-            r.setStatus(RequestStatus.REJECTED);
+            r.setStatus(REJECTED);
         }
+
         requestRepo.saveAll(requests);
+
         return new EventRequestStatusUpdateResult(
                 List.of(),
                 requests.stream().map(ParticipationRequestMapper::toDto).toList()
