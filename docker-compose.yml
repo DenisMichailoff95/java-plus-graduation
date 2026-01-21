@@ -1,158 +1,30 @@
-# =============================================================================
-# EXPLORE WITH ME - DOCKER COMPOSE CONFIGURATION
-# =============================================================================
-
 version: '3.8'
 
-# =============================================================================
-# SERVICES
-# =============================================================================
-
 services:
-  # ===========================================================================
-  # MAIN DATABASE (ewm)
-  # ===========================================================================
   ewm-db:
-    image: postgres:16.1-alpine
+    image: postgres:16.1
     container_name: ewm-postgres
-    restart: unless-stopped
-
-    # Port Mapping
     ports:
       - "5432:5432"
-
-    # Environment Variables
     environment:
-      POSTGRES_DB: ewm
-      POSTGRES_USER: ewm
-      POSTGRES_PASSWORD: ewm
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
-      PGDATA: /var/lib/postgresql/data/pgdata
-
-    # Volumes for Data Persistence
+      - POSTGRES_PASSWORD=ewm
+      - POSTGRES_USER=ewm
+      - POSTGRES_DB=ewm
     volumes:
       - postgres_ewm_data:/var/lib/postgresql/data
-      - ./init-scripts/ewm-init.sql:/docker-entrypoint-initdb.d/01-init.sql
 
-    # Health Check
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d ewm"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-    # Resource Limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-
-  # ===========================================================================
-  # STATISTICS DATABASE (stats)
-  # ===========================================================================
   stats-db:
-    image: postgres:16.1-alpine
+    image: postgres:16.1
     container_name: stats-postgres
-    restart: unless-stopped
-
-    # Port Mapping (different port)
     ports:
       - "5433:5432"
-
-    # Environment Variables
     environment:
-      POSTGRES_DB: stats
-      POSTGRES_USER: stats
-      POSTGRES_PASSWORD: stats123
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
-      PGDATA: /var/lib/postgresql/data/pgdata
-
-    # Volumes for Data Persistence
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_USER=test
+      - POSTGRES_DB=stats
     volumes:
       - postgres_stats_data:/var/lib/postgresql/data
-      - ./init-scripts/stats-init.sql:/docker-entrypoint-initdb.d/01-init.sql
-
-    # Health Check
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U stats -d stats"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-    # Resource Limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-
-  # ===========================================================================
-  # ADMINER - DATABASE MANAGEMENT (OPTIONAL)
-  # ===========================================================================
-  adminer:
-    image: adminer:latest
-    container_name: ewm-adminer
-    restart: unless-stopped
-
-    # Port Mapping
-    ports:
-      - "8081:8080"
-
-    # Environment Variables
-    environment:
-      ADMINER_DEFAULT_SERVER: ewm-db
-
-    # Dependencies
-    depends_on:
-      ewm-db:
-        condition: service_healthy
-      stats-db:
-        condition: service_healthy
-
-    # Resource Limits
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-        reservations:
-          memory: 64M
-
-# =============================================================================
-# VOLUMES
-# =============================================================================
 
 volumes:
-  # Volume for Main Database
   postgres_ewm_data:
-    name: ewm_postgres_data
-    driver: local
-
-  # Volume for Statistics Database
   postgres_stats_data:
-    name: stats_postgres_data
-    driver: local
-
-# =============================================================================
-# NETWORKS
-# =============================================================================
-
-networks:
-  default:
-    name: ewm-network
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
-
-# =============================================================================
-# ENVIRONMENT SPECIFIC OVERRIDES
-# =============================================================================
-
-# Development Environment Override
-# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-# File: docker-compose.dev.yml (create if needed)
