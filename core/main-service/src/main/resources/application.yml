@@ -76,9 +76,12 @@ spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: UTC
-    default-property-inclusion: non_null  # Не сериализуем null поля
+    default-property-inclusion: always  # Сериализуем все поля, включая null
     deserialization:
       fail-on-unknown-properties: false  # Игнорируем неизвестные свойства
+    serialization:
+      write-dates-as-timestamps: false  # Даты как строки, а не timestamp
+      write-null-map-values: true  # Сериализуем null значения в Map
   servlet:
     multipart:
       max-file-size: 10MB
