@@ -1,7 +1,7 @@
 package ru.practicum.mainservice.statsclient;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.*;
@@ -19,14 +19,17 @@ import java.util.List;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class StatsClientImpl {
 
     private static final String STATS_SERVICE_BASE_URL = "http://stats-server";
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    @Qualifier("simpleRestTemplate")
     private final RestTemplate restTemplate;
+
+    @Autowired
+    public StatsClientImpl(@Qualifier("simpleRestTemplate") RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     public void saveHit(EndpointHitDTO endpointHitDTO) {
         try {
