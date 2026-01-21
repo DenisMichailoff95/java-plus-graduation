@@ -1,3 +1,43 @@
+# Логи
+*.log
+logs/
+
+# Идея
+.idea/
+*.iml
+*.iws
+
+# Целевая директория Maven
+target/
+**/target/
+
+# Временные файлы
+*.tmp
+*.temp
+
+# Файлы окружения
+.env
+.env.local
+
+# Docker
+docker-compose.override.yml
+
+# Базы данных
+*.db
+*.sqlite
+
+# Операционные системы
+.DS_Store
+Thumbs.db
+
+# Профилирование
+*.hprof
+*.jfr
+
+# Документация
+**/docs/api/
+**/docs/generated/
+
 *.class
 *.log
 *.jar

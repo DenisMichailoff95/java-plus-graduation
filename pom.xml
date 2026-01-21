@@ -11,6 +11,7 @@
     </parent>
 
     <name>Explore With Me</name>
+    <description>Service for event exploration and participation</description>
 
     <groupId>ru.practicum</groupId>
     <artifactId>explore-with-me</artifactId>
@@ -20,7 +21,17 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <spring-cloud.version>2024.0.0</spring-cloud.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <lombok.version>1.18.38</lombok.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
+        <maven-checkstyle-plugin.version>3.3.1</maven-checkstyle-plugin.version>
+        <checkstyle.version>10.17.0</checkstyle.version>
+        <spotbugs.version>4.8.6.1</spotbugs.version>
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
     <modules>
@@ -38,6 +49,24 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Общие зависимости для всех модулей -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+                <scope>provided</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -46,8 +75,29 @@
             <plugins>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-surefire-plugin</artifactId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
                     <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                        <compilerArgs>
+                            <arg>-parameters</arg>
+                        </compilerArgs>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                    <configuration>
+                        <argLine>-Dfile.encoding=UTF-8</argLine>
                         <systemPropertyVariables>
                             <spring.profiles.active>test</spring.profiles.active>
                         </systemPropertyVariables>
@@ -56,61 +106,56 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-checkstyle-plugin</artifactId>
-                    <version>3.1.2</version>
+                    <version>${maven-checkstyle-plugin.version}</version>
                     <configuration>
                         <configLocation>checkstyle.xml</configLocation>
+                        <encoding>UTF-8</encoding>
+                        <consoleOutput>true</consoleOutput>
+                        <failsOnError>true</failsOnError>
                         <failOnViolation>true</failOnViolation>
-                        <logViolationsToConsole>true</logViolationsToConsole>
+                        <violationSeverity>warning</violationSeverity>
                         <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                        <excludes>**/generated-sources/**</excludes>
                     </configuration>
-                    <executions>
-                        <execution>
-                            <goals>
-                                <goal>check</goal>
-                            </goals>
-                            <phase>compile</phase>
-                        </execution>
-                    </executions>
                     <dependencies>
                         <dependency>
                             <groupId>com.puppycrawl.tools</groupId>
                             <artifactId>checkstyle</artifactId>
-                            <version>10.3</version>
+                            <version>${checkstyle.version}</version>
                         </dependency>
                     </dependencies>
                 </plugin>
                 <plugin>
                     <groupId>com.github.spotbugs</groupId>
                     <artifactId>spotbugs-maven-plugin</artifactId>
-                    <version>4.8.5.0</version>
+                    <version>${spotbugs.version}</version>
                     <configuration>
                         <effort>Max</effort>
                         <threshold>High</threshold>
+                        <xmlOutput>true</xmlOutput>
+                        <failOnError>true</failOnError>
                     </configuration>
-                    <executions>
-                        <execution>
-                            <goals>
-                                <goal>check</goal>
-                            </goals>
-                        </execution>
-                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
-                    <version>0.8.12</version>
-                    <configuration>
-                        <output>file</output>
-                    </configuration>
+                    <version>${jacoco.version}</version>
                     <executions>
                         <execution>
-                            <id>jacoco-initialize</id>
+                            <id>prepare-agent</id>
                             <goals>
                                 <goal>prepare-agent</goal>
                             </goals>
                         </execution>
                         <execution>
-                            <id>jacoco-check</id>
+                            <id>report</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>report</goal>
+                            </goals>
+                        </execution>
+                        <execution>
+                            <id>check</id>
                             <goals>
                                 <goal>check</goal>
                             </goals>
@@ -154,18 +199,42 @@
                                 </rules>
                             </configuration>
                         </execution>
-                        <execution>
-                            <id>jacoco-site</id>
-                            <phase>install</phase>
-                            <goals>
-                                <goal>report</goal>
-                            </goals>
-                        </execution>
                     </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>3.4.5</version>
+                    <configuration>
+                        <executable>true</executable>
+                        <jvmArguments>-Dfile.encoding=UTF-8</jvmArguments>
+                    </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/*.properties</include>
+                    <include>**/*.yml</include>
+                    <include>**/*.yaml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>**/*.properties</exclude>
+                    <exclude>**/*.yml</exclude>
+                    <exclude>**/*.yaml</exclude>
+                </excludes>
+            </resource>
+        </resources>
     </build>
+
     <profiles>
         <profile>
             <id>check</id>
@@ -181,14 +250,6 @@
                     </plugin>
                 </plugins>
             </build>
-            <reporting>
-                <plugins>
-                    <plugin>
-                        <groupId>com.github.spotbugs</groupId>
-                        <artifactId>spotbugs-maven-plugin</artifactId>
-                    </plugin>
-                </plugins>
-            </reporting>
         </profile>
         <profile>
             <id>coverage</id>
@@ -201,6 +262,22 @@
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <id>docker</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.google.cloud.tools</groupId>
+                        <artifactId>jib-maven-plugin</artifactId>
+                        <version>3.4.4</version>
+                        <configuration>
+                            <to>
+                                <image>explore-with-me:latest</image>
+                            </to>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
-
 </project>
