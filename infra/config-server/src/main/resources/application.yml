@@ -1,5 +1,5 @@
 server:
-  port: 0  # Случайный порт для config-server
+  port: 8888  # Config Server должен иметь фиксированный порт для обнаружения другими сервисами
 
 spring:
   application:
@@ -10,71 +10,89 @@ spring:
     config:
       server:
         native:
-          searchLocations:
-            - classpath:/config/{application}
-            - classpath:/config/{application}/{profile}
-            - file:./config/{application}  # Дополнительно из файловой системы
-            - file:./config/{application}/{profile}
+          search-locations:
+            - classpath:config/{application}
+            - file:./config/{application}  # Добавлена поддержка внешних конфигов
+          fail-on-error: true
+        enabled: true
         health:
-          enabled: true  # Health endpoint для config-server
-        composite:  # Поддержка composite источников
-          - type: native
-            searchLocations: ${spring.cloud.config.server.native.searchLocations}
+          enabled: true
+      fail-fast: true  # Гарантирует, что клиенты будут ждать готовности Config Server
 
+# Настройки Eureka - Config Server должен регистрироваться с фиксированным портом
+eureka:
+  client:
+    enabled: true
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    healthcheck:
+      enabled: true
+    registry-fetch-interval-seconds: 30
+    initial-instance-info-replication-interval-seconds: 30
+    instance-info-replication-interval-seconds: 30
+  instance:
+    prefer-ip-address: false  # Для локальной разработки
+    instance-id: ${spring.application.name}:${server.port}  # Фиксированный ID с портом
+    hostname: localhost
+    non-secure-port: ${server.port}  # Явное указание порта
+    secure-port: ${server.port}
+    secure-port-enabled: false
+    non-secure-port-enabled: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+    status-page-url-path: /actuator/info
+    health-check-url-path: /actuator/health
+    metadata-map:
+      startup: ${random.int}  # Для обновления конфигурации при перезапуске
+      configServer: ${spring.cloud.config.server.git.uri:unknown}  # Информация о конфиг-сервере
+
+# Настройки Actuator
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,env,bindings,refresh
+        include: health,info,configprops,env,refresh,bindings
+      base-path: /actuator
   endpoint:
     health:
       show-details: when-authorized
       probes:
         enabled: false
+    info:
+      enabled: true
+    configprops:
+      enabled: true
     env:
-      show-values: when-authorized  # Безопасный показ значений
+      enabled: true
+    refresh:
+      enabled: true
   info:
-    env:
-      enabled: true
+    git:
+      mode: full
 
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
-    healthcheck:
-      enabled: true
-    fetch-registry: true
-    register-with-eureka: true
-    registry-fetch-interval-seconds: 10  # Чаще обновляем для config-server
-  instance:
-    preferIpAddress: true
-    instance-id: ${spring.application.name}:${random.int[10000,99999]}
-    lease-renewal-interval-in-seconds: 5  # Чаще обновляем lease
-    lease-expiration-duration-in-seconds: 10  # Быстрее expire для быстрого обнаружения проблем
-    metadata-map:
-      configPath: /config  # Метаданные о пути к конфигурации
-
-# Безопасность (закомментировано, можно включить при необходимости)
-#security:
-#  basic:
-#    enabled: true
-#  user:
-#    name: admin
-#    password: ${CONFIG_SERVER_PASSWORD:changeme}
-
+# Настройки логирования
 logging:
   level:
     org.springframework.cloud.config: INFO
-    org.springframework.boot.actuate: INFO
+    ru.practicum: INFO
     com.netflix.eureka: WARN
     com.netflix.discovery: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %-40.40logger{39} : %msg%n"
   file:
     name: logs/config-server.log
     max-size: 10MB
-    max-history: 30
+    max-history: 7
 
-# Настройки для cache
-spring.cloud.config.server.native.cache.enabled: true
-spring.cloud.config.server.native.cache.time-to-live: 30000  # 30 секунд кэш
+# Настройки для информирования клиентов о доступности конфигурации
+spring.cloud.config.server.git.timeout: 10
+spring.cloud.config.server.native.fail-fast: true
+
+# Дополнительные настройки для отладки
+debug: false
+
+# Настройки для работы с клиентами на случайных портах
+spring.cloud.config.discovery.enabled: true  # Включить обнаружение через Eureka
+spring.cloud.config.discovery.service-id: config-server  # ID сервиса для обнаружения
