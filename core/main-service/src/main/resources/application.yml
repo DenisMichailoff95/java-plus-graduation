@@ -17,12 +17,12 @@ spring:
   application:
     name: main-service
   config:
-    import: "optional:configserver:"  # Обязательная настройка, но optional
+    import: "optional:configserver:"
   cloud:
     config:
-      enabled: false  # Отключаем config client
+      enabled: false
       import-check:
-        enabled: false  # Отключаем проверку импорта
+        enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5432/ewm
     username: ewm
@@ -56,22 +56,39 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
+      base-path: /manage
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: false
 
 eureka:
   client:
-    enabled: false  # Отключаем Eureka для упрощения запуска
+    enabled: true  # Включаем Eureka для регистрации
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
+    healthcheck:
+      enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+    registry-fetch-interval-seconds: 30
+  instance:
+    preferIpAddress: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+    metadata-map:
+      instanceId: ${spring.application.instance_id:${random.value}}
 
 # Настройки для локального запуска
 logging:
   level:
     ru.practicum: INFO
     org.springframework: INFO
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
