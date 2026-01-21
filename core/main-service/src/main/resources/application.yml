@@ -1,23 +1,47 @@
-# Конфигурация для main-service через config-server
-# Базовые настройки, которые переопределяют локальные
+server:
+  port: 0  # Случайный порт согласно требованиям
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 10
 
 spring:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  application:
+    name: main-service
+  config:
+    import: "optional:configserver:"  # Обязательная настройка, но optional
+  cloud:
+    config:
+      enabled: false  # Отключаем config client
+      import-check:
+        enabled: false  # Отключаем проверку импорта
   datasource:
+    url: jdbc:postgresql://localhost:5432/ewm
+    username: ewm
+    password: ewm
     hikari:
       connection-timeout: 30000
-      maximum-pool-size: 15  # Увеличиваем для production
+      maximum-pool-size: 10
       minimum-idle: 5
       idle-timeout: 600000
       max-lifetime: 1800000
       connection-test-query: SELECT 1
-      pool-name: MainServiceHikariCP-Production
   jpa:
+    open-in-view: false
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
     properties:
       hibernate:
-        format_sql: false  # Отключаем в production
-        jdbc:
-          batch_size: 30  # Увеличиваем batch для production
-        generate_statistics: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
   mvc:
     format:
       date-time: yyyy-MM-dd HH:mm:ss
@@ -27,75 +51,33 @@ spring:
     default-property-inclusion: always
     deserialization:
       fail-on-unknown-properties: false
-  servlet:
-    multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
-      base-path: /manage
+        include: health,info
   endpoint:
     health:
       show-details: when-authorized
-      probes:
-        enabled: false
-    metrics:
-      enabled: true
-      export:
-        prometheus:
-          enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
-    tags:
-      application: ${spring.application.name}
 
 eureka:
   client:
+    enabled: false  # Отключаем Eureka для упрощения запуска
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
-    healthcheck:
-      enabled: true
-    fetch-registry: true
-    register-with-eureka: true
-    registry-fetch-interval-seconds: 30
-  instance:
-    preferIpAddress: true
-    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 90
-    metadata-map:
-      instanceId: ${spring.application.instance_id:${random.value}}
-      port: ${server.port}
-      management.port: ${server.port}
 
+# Настройки для локального запуска
 logging:
   level:
     ru.practicum: INFO
     org.springframework: INFO
-    org.hibernate.SQL: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-  file:
-    name: /var/log/main-service/main-service.log
-    max-size: 10MB
-    max-history: 30
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
-# Production настройки приложения
+# Кастомные настройки приложения для локального запуска
 app:
   stats:
     enabled: true
-    batch-size: 500  # Больший batch для production
-    retry-attempts: 5
-    timeout-ms: 10000
-  events:
-    default-page-size: 20
-    max-page-size: 1000
-  comments:
-    max-length: 2000
-    default-page-size: 50
+    server:
+      url: http://localhost:9090  # Локальный адрес stats-server
