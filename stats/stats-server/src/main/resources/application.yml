@@ -5,176 +5,79 @@ server:
       charset: UTF-8
       enabled: true
       force: true
-  compression:
-    enabled: true
-    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
-    min-response-size: 1024
   tomcat:
-    max-threads: 100  # Меньше потоков, так как stats-server проще
-    min-spare-threads: 5
-    connection-timeout: 5000
-    accesslog:
-      enabled: true
-      pattern: '%{X-Forwarded-For}i %l %u %t "%r" %s %b %D'
-      directory: logs
-      prefix: access-stats
-      suffix: .log
-      file-date-format: .yyyy-MM-dd
+    max-threads: 200
+    min-spare-threads: 10
 
 spring:
   sql:
     init:
       mode: always
       schema-locations: classpath:schema.sql
-      continue-on-error: false
   application:
-    name: stats-server
+    name: main-service
   config:
-    import: "configserver:"
-    fail-fast: false
+    import: optional:configserver:http://localhost:8888  # optional: для возможности запуска без config-server
   cloud:
     config:
+      enabled: false  # Отключаем config client для упрощения запуска
       discovery:
-        enabled: true
-        service-id: config-server
-      fail-fast: false
-      retry:
-        max-attempts: 6
-        initial-interval: 1000
-        max-interval: 2000
-        multiplier: 1.5
+        enabled: false  # Отключаем discovery для config server
   datasource:
+    url: jdbc:postgresql://localhost:5432/ewm
+    username: ewm
+    password: ewm
     hikari:
       connection-timeout: 30000
-      maximum-pool-size: 8  # Меньше соединений для stats сервиса
-      minimum-idle: 3
+      maximum-pool-size: 10
+      minimum-idle: 5
       idle-timeout: 600000
       max-lifetime: 1800000
       connection-test-query: SELECT 1
-      pool-name: StatsServerHikariCP
-    initialization-mode: always
   jpa:
     open-in-view: false
-    show-sql: false  # Отключаем SQL логи в production
-    properties:
-      hibernate:
-        format_sql: false
-        jdbc:
-          batch_size: 50  # Больший batch для массовых вставок hits
-        order_inserts: true
-        order_updates: true
-        generate_statistics: false
-        query:
-          in_clause_parameter_padding: true
+    show-sql: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
   mvc:
     format:
       date-time: yyyy-MM-dd HH:mm:ss
-    pathmatch:
-      matching-strategy: ant_path_matcher
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: UTC
-    default-property-inclusion: always  # Сериализуем все поля
+    default-property-inclusion: always
     deserialization:
       fail-on-unknown-properties: false
-    serialization:
-      write-dates-as-timestamps: false
-  servlet:
-    multipart:
-      max-file-size: 1MB  # Меньше размер для stats сервиса
-      max-request-size: 1MB
-  lifecycle:
-    timeout-per-shutdown-phase: 20s  # Меньше таймаут для graceful shutdown
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
-      base-path: /manage
+        include: health,info
   endpoint:
     health:
       show-details: when-authorized
-      probes:
-        enabled: false
-      group:
-        readiness:
-          include: db,diskSpace,ping
-        liveness:
-          include: ping
-    metrics:
-      enabled: true
-      export:
-        prometheus:
-          enabled: true
-    info:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
-    tags:
-      application: ${spring.application.name}
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
 
 eureka:
   client:
+    enabled: false  # Отключаем Eureka для упрощения запуска
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
-    healthcheck:
-      enabled: true
-    fetch-registry: true
-    register-with-eureka: true
-    registry-fetch-interval-seconds: 30
-    instance-info-replication-interval-seconds: 30
-  instance:
-    preferIpAddress: true
-    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 90
-    hostname: ${HOSTNAME:localhost}
-    metadata-map:
-      instanceId: ${spring.application.instance_id:${random.value}}
-      port: ${server.port}
-      management.port: ${server.port}
 
-# Настройки логирования для stats-server
+# Настройки для локального запуска
 logging:
   level:
     ru.practicum: INFO
-    org.springframework.web: INFO
-    org.springframework.cloud: INFO
-    org.springframework.retry: WARN
-    com.netflix.eureka: WARN
-    com.netflix.discovery: WARN
-    org.hibernate.SQL: WARN  # Меньше SQL логов для stats
+    org.springframework: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [port:${server.port}] - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [port:${server.port}] - %msg%n"
-  file:
-    name: logs/stats-server-${server.port}.log
-    max-size: 10MB
-    max-history: 30
-  logback:
-    rollingpolicy:
-      max-history: 30
-      clean-history-on-start: false
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
-# Кастомные настройки stats сервиса
+# Кастомные настройки приложения для локального запуска
 app:
-  name: Explore With Me Stats Server
-  version: 0.0.1
-  description: Сервис статистики для подсчета просмотров событий
   stats:
-    retention-days: 365  # Храним статистику 1 год
-    cleanup-enabled: true
-    cleanup-interval: 86400000  # 24 часа
-    batch-insert-size: 1000  # Размер батча для вставки hits
-  endpoints:
-    hit-path: /hit
-    stats-path: /stats
-    batch-hit-path: /hit/batch  # Для будущего использования
+    enabled: true
+    server:
+      url: http://localhost:9090  # Локальный адрес stats-server
