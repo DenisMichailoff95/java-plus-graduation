@@ -17,56 +17,15 @@ spring:
             - Path=/admin/**,/users/**,/events/**,/categories/**,/compilations/**,/comments/**
           filters:
             - StripPrefix=0
-            - name: Retry
-              args:
-                retries: 3
-                series: SERVER_ERROR
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
-                key-resolver: "#{@remoteAddrKeyResolver}"
         - id: stats-service
           uri: lb://STATS-SERVER
           predicates:
             - Path=/stats/**,/hit/**
           filters:
             - StripPrefix=0
-            - name: Retry
-              args:
-                retries: 2
-                series: SERVER_ERROR
-        - id: discovery-server
-          uri: http://localhost:8761
-          predicates:
-            - Path=/eureka/web
-          filters:
-            - SetPath=/
-        - id: config-server
-          uri: http://localhost:8888
-          predicates:
-            - Path=/config/**
-          filters:
-            - StripPrefix=1
-        - id: actuator
-          uri: lb://MAIN-SERVICE
-          predicates:
-            - Path=/actuator/**
-          filters:
-            - StripPrefix=1
-      default-filters:
-        - AddResponseHeader=X-Response-Time, "${spring.cloud.gateway.metrics.tags.remoteAddress}"
-        - name: CircuitBreaker
-          args:
-            name: mainServiceCircuitBreaker
-            fallbackUri: forward:/fallback/main-service
       httpclient:
         connect-timeout: 5000
         response-timeout: 10000
-        pool:
-          type: elastic
-          max-connections: 1000
-          acquire-timeout: 45000
       metrics:
         enabled: true
     loadbalancer:
@@ -94,41 +53,21 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway,routes,metrics,httptrace,circuitbreakers
+        include: health,info,gateway,routes
       base-path: /actuator
-      cors:
-        allowed-origins: "*"
-        allowed-methods: GET,POST
   endpoint:
     gateway:
       enabled: true
     health:
-      show-details: always
+      show-details: when-authorized
       probes:
         enabled: false
-    metrics:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-    web:
-      server:
-        request:
-          autotime:
-            enabled: true
-  tracing:
-    sampling:
-      probability: 1.0
 
 # Настройки логирования
 logging:
   level:
-    org.springframework.cloud.gateway: DEBUG
-    reactor.netty.http.client: DEBUG
+    org.springframework.cloud.gateway: INFO
+    reactor.netty.http.client: INFO
     ru.practicum: INFO
     org.springframework.cloud.loadbalancer: INFO
   pattern:
@@ -137,19 +76,6 @@ logging:
     name: logs/gateway-server.log
     max-size: 10MB
     max-history: 10
-
-# Настройки для обработки ошибок
-spring.cloud.gateway.default-filters[0].name: DedupeResponseHeader
-spring.cloud.gateway.default-filters[0].args.name: Access-Control-Allow-Credentials Access-Control-Allow-Origin
-
-# Fallback конфигурация
-spring.cloud.gateway.routes[2].predicates[0]: Path=/fallback/**
-spring.cloud.gateway.routes[2].filters[0]: SetPath=/fallback-response
-
-# Конфигурация для rate limiting (требует Redis)
-spring.redis.host: localhost
-spring.redis.port: 6379
-spring.redis.timeout: 2000ms
 
 # Кастомные настройки
 app:
@@ -160,8 +86,3 @@ app:
       allowed-headers: "*"
       allow-credentials: true
       max-age: 3600
-    rate-limit:
-      enabled: false  # Отключено по умолчанию, требует Redis
-    circuit-breaker:
-      enabled: true
-      timeout: 5000
