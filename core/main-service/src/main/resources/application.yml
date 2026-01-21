@@ -53,7 +53,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         jdbc:
           batch_size: 20
         order_inserts: true
@@ -61,10 +60,6 @@ spring:
         generate_statistics: false  # Отключаем в production
         query:
           in_clause_parameter_padding: true  # Оптимизация IN запросов
-      javax:
-        persistence:
-          validation:
-            mode: none  # Валидация через Bean Validation
     hibernate:
       ddl-auto: validate  # Только валидация схемы
   mvc:
@@ -87,16 +82,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,env,beans  # Добавляем метрики для мониторинга
+        include: health,info,metrics,prometheus  # Добавляем метрики для мониторинга
       base-path: /manage  # Отдельный путь для management endpoints
   endpoint:
     health:
       show-details: when-authorized
       probes:
-        enabled: true  # Kubernetes health probes
+        enabled: false  # Отключаем Kubernetes health probes (не требуется для Eureka)
       group:
         readiness:
-          include: db,diskSpace,eureka
+          include: db,diskSpace,ping
         liveness:
           include: ping
     metrics:
@@ -181,6 +176,3 @@ app:
     default-page-size: 20
   validation:
     request-timeout: 5000  # Таймаут для валидации запросов
-
-# Graceful shutdown настройки
-spring.lifecycle.timeout-per-shutdown-phase: 30s
