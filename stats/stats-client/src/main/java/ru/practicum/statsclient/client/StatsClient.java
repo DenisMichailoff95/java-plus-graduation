@@ -2,6 +2,7 @@ package ru.practicum.statsclient.client;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.dto.EndpointHitDTO;
 import ru.practicum.dto.ViewStatsDTO;
@@ -13,12 +14,19 @@ import java.util.List;
 
 public abstract class StatsClient {
     private final RestClient restClient;
-    private final String serverUrl;
+    private final String baseUrl;
 
     public StatsClient(String serverUrl) {
-        this.serverUrl = serverUrl;
+        this.baseUrl = serverUrl;
         this.restClient = RestClient.builder()
                 .baseUrl(serverUrl)
+                .build();
+    }
+
+    public StatsClient(RestTemplate restTemplate, String serviceName) {
+        this.baseUrl = "http://" + serviceName;
+        this.restClient = RestClient.builder()
+                .baseUrl(this.baseUrl)
                 .build();
     }
 
@@ -56,7 +64,8 @@ public abstract class StatsClient {
 
     public List<ViewStatsDTO> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
         validateDates(start, end);
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl("/stats")
+
+        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(baseUrl + "/stats")
                 .queryParam("start", DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(start))
                 .queryParam("end", DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(end))
                 .queryParam("unique", unique);
