@@ -1,126 +1,59 @@
-server:
-  port: 0  # Случайный порт согласно требованиям
-  servlet:
-    encoding:
-      charset: UTF-8
-      enabled: true
-      force: true
-  compression:
-    enabled: true
-    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
-    min-response-size: 1024
-  tomcat:
-    max-threads: 200  # Оптимизация для Tomcat
-    min-spare-threads: 10
-    connection-timeout: 5000
-    accesslog:
-      enabled: true  # Включаем access log для отладки
-      pattern: '%{X-Forwarded-For}i %l %u %t "%r" %s %b %D'
-      directory: logs
-      prefix: access
-      suffix: .log
-      file-date-format: .yyyy-MM-dd
+# Конфигурация для main-service через config-server
+# Базовые настройки, которые переопределяют локальные
 
 spring:
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:schema.sql
-      continue-on-error: false  # Останавливаться при ошибке инициализации
-  application:
-    name: main-service
-  config:
-    import: "configserver:"
-    fail-fast: false  # Продолжать работу при недоступности config server
-  cloud:
-    config:
-      discovery:
-        enabled: true
-        service-id: config-server
-      fail-fast: false
-      retry:
-        max-attempts: 6
-        initial-interval: 1000
-        max-interval: 2000
-        multiplier: 1.5
   datasource:
     hikari:
       connection-timeout: 30000
-      maximum-pool-size: 10
+      maximum-pool-size: 15  # Увеличиваем для production
       minimum-idle: 5
       idle-timeout: 600000
       max-lifetime: 1800000
       connection-test-query: SELECT 1
-      pool-name: MainServiceHikariCP
-    initialization-mode: always  # Явное указание режима инициализации
+      pool-name: MainServiceHikariCP-Production
   jpa:
-    open-in-view: false  # Отключаем для предотвращения проблем с производительностью
-    show-sql: true
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false  # Отключаем в production
         jdbc:
-          batch_size: 20
-        order_inserts: true
-        order_updates: true
-        generate_statistics: false  # Отключаем в production
-        query:
-          in_clause_parameter_padding: true  # Оптимизация IN запросов
-    hibernate:
-      ddl-auto: validate  # Только валидация схемы
+          batch_size: 30  # Увеличиваем batch для production
+        generate_statistics: false
   mvc:
     format:
       date-time: yyyy-MM-dd HH:mm:ss
-    pathmatch:
-      matching-strategy: ant_path_matcher  # Для совместимости с Spring Cloud Gateway
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: UTC
-    default-property-inclusion: always  # Сериализуем все поля, включая null
+    default-property-inclusion: always
     deserialization:
-      fail-on-unknown-properties: false  # Игнорируем неизвестные свойства
-    serialization:
-      write-dates-as-timestamps: false  # Даты как строки, а не timestamp
-      write-null-map-values: true  # Сериализуем null значения в Map
+      fail-on-unknown-properties: false
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
-  lifecycle:
-    timeout-per-shutdown-phase: 30s  # Таймаут для graceful shutdown
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus  # Добавляем метрики для мониторинга
-      base-path: /manage  # Отдельный путь для management endpoints
+        include: health,info,metrics,prometheus
+      base-path: /manage
   endpoint:
     health:
       show-details: when-authorized
       probes:
-        enabled: false  # Отключаем Kubernetes health probes
-      group:
-        readiness:
-          include: db,diskSpace,ping
-        liveness:
-          include: ping
+        enabled: false
     metrics:
       enabled: true
       export:
         prometheus:
           enabled: true
-    info:
-      enabled: true
   metrics:
     export:
       prometheus:
         enabled: true
     tags:
       application: ${spring.application.name}
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true  # Гистограмма для HTTP метрик
 
 eureka:
   client:
@@ -131,55 +64,38 @@ eureka:
     fetch-registry: true
     register-with-eureka: true
     registry-fetch-interval-seconds: 30
-    instance-info-replication-interval-seconds: 30
   instance:
     preferIpAddress: true
     instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
     lease-renewal-interval-in-seconds: 30
     lease-expiration-duration-in-seconds: 90
-    hostname: ${HOSTNAME:localhost}
     metadata-map:
       instanceId: ${spring.application.instance_id:${random.value}}
-      port: ${server.port}  # Сохраняем случайный порт в метаданных
-      management.port: ${server.port}  # Management на том же порту
+      port: ${server.port}
+      management.port: ${server.port}
 
-# Настройки логирования с учетом случайного порта
 logging:
   level:
-    ru.practicum: INFO  # Меньше логов в production
-    org.hibernate.SQL: INFO
-    org.springframework.web: INFO
-    org.springframework.cloud: INFO
-    org.springframework.retry: WARN
-    com.netflix.eureka: WARN  # Уменьшаем логи Eureka
-    com.netflix.discovery: WARN
+    ru.practicum: INFO
+    org.springframework: INFO
+    org.hibernate.SQL: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [port:${server.port}] - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [port:${server.port}] - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
   file:
-    name: logs/main-service-${server.port}.log  # Логи с номером порта в имени файла
+    name: /var/log/main-service/main-service.log
     max-size: 10MB
     max-history: 30
-  logback:
-    rollingpolicy:
-      max-history: 30
-      clean-history-on-start: false
 
-# Кастомные настройки приложения
+# Production настройки приложения
 app:
-  name: Explore With Me Main Service
-  version: 0.0.1
-  description: Основной сервис для управления событиями
   stats:
     enabled: true
-    batch-size: 100  # Размер батча для отправки статистики
-    retry-attempts: 3  # Количество попыток повторной отправки
-    timeout-ms: 5000  # Таймаут для запросов к stats-server
+    batch-size: 500  # Больший batch для production
+    retry-attempts: 5
+    timeout-ms: 10000
   events:
-    default-page-size: 10
-    max-page-size: 100
+    default-page-size: 20
+    max-page-size: 1000
   comments:
     max-length: 2000
-    default-page-size: 20
-  validation:
-    request-timeout: 5000  # Таймаут для валидации запросов
+    default-page-size: 50
