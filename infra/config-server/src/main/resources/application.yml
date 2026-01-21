@@ -1,5 +1,5 @@
 server:
-  port: 0
+  port: 0  # Случайный порт для config-server
 
 spring:
   application:
@@ -11,14 +11,70 @@ spring:
       server:
         native:
           searchLocations:
-            - classpath:config/{application}
-            - classpath:config/{application}/{profile}
+            - classpath:/config/{application}
+            - classpath:/config/{application}/{profile}
+            - file:./config/{application}  # Дополнительно из файловой системы
+            - file:./config/{application}/{profile}
+        health:
+          enabled: true  # Health endpoint для config-server
+        composite:  # Поддержка composite источников
+          - type: native
+            searchLocations: ${spring.cloud.config.server.native.searchLocations}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,bindings,refresh
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: false
+    env:
+      show-values: when-authorized  # Безопасный показ значений
+  info:
+    env:
+      enabled: true
 
 eureka:
   client:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
+    healthcheck:
+      enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+    registry-fetch-interval-seconds: 10  # Чаще обновляем для config-server
   instance:
     preferIpAddress: true
     instance-id: ${spring.application.name}:${random.int[10000,99999]}
-    lease-renewal-interval-in-seconds: 10
+    lease-renewal-interval-in-seconds: 5  # Чаще обновляем lease
+    lease-expiration-duration-in-seconds: 10  # Быстрее expire для быстрого обнаружения проблем
+    metadata-map:
+      configPath: /config  # Метаданные о пути к конфигурации
+
+# Безопасность (закомментировано, можно включить при необходимости)
+#security:
+#  basic:
+#    enabled: true
+#  user:
+#    name: admin
+#    password: ${CONFIG_SERVER_PASSWORD:changeme}
+
+logging:
+  level:
+    org.springframework.cloud.config: INFO
+    org.springframework.boot.actuate: INFO
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/config-server.log
+    max-size: 10MB
+    max-history: 30
+
+# Настройки для cache
+spring.cloud.config.server.native.cache.enabled: true
+spring.cloud.config.server.native.cache.time-to-live: 30000  # 30 секунд кэш
