@@ -3,7 +3,7 @@ server:
   compression:
     enabled: true
   netty:
-    connection-timeout: 30000  # Изменить с 30s на 30000 (миллисекунды)
+    connection-timeout: 30000
 
 spring:
   application:
@@ -37,11 +37,12 @@ spring:
               args:
                 name: mainService
                 fallbackUri: forward:/fallback/main
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
-                key-resolver: "#{@userKeyResolver}"
+            # Временно отключаем rate limiting для тестов
+            # - name: RequestRateLimiter
+            #   args:
+            #     redis-rate-limiter.replenishRate: 100
+            #     redis-rate-limiter.burstCapacity: 200
+            #     key-resolver: "#{@userKeyResolver}"
             - name: Retry
               args:
                 retries: 3
@@ -65,9 +66,76 @@ spring:
                 fallbackUri: forward:/fallback/stats
       httpclient:
         connect-timeout: 5000
-        response-timeout: 10000  # Изменить с 10s на 10000
+        response-timeout: 10000
         pool:
           type: elastic
-          max-idle-time: 60000  # Изменить с 60s на 60000
+          max-idle-time: 60000
           max-connections: 1000
-          acquire-timeout: 45000  # Изменить с 45s на 45000
+          acquire-timeout: 45000
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+    healthcheck:
+      enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+    registry-fetch-interval-seconds: 10
+  instance:
+    preferIpAddress: true
+    instance-id: ${spring.application.name}:${server.port}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,routes,metrics,prometheus
+      base-path: /manage
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      mainService:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5000
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+      statsService:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10000
+        failureRateThreshold: 50
+  timelimiter:
+    instances:
+      mainService:
+        timeoutDuration: 3000
+      statsService:
+        timeoutDuration: 5000
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    reactor.netty: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/gateway-server.log
+    max-size: 10MB
+    max-history: 30

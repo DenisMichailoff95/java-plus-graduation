@@ -140,16 +140,22 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     }
 
     private void checkParticipantLimit(Event event, Long eventId) {
-        long confirmed = requestRepo.countByEventIdAndStatus(eventId, CONFIRMED);
-        if (event.getParticipantLimit() > 0 && confirmed >= event.getParticipantLimit()) {
+        int confirmed = requestRepo.countByEventIdAndStatus(eventId, CONFIRMED);
+
+        // Проверяем participantLimit, а не participant_limit
+        if (event.getParticipantLimit() != null && event.getParticipantLimit() > 0
+                && confirmed >= event.getParticipantLimit()) {
             throw new ConditionNotMetException("Лимит участников мероприятия достигнут.");
         }
     }
 
     private RequestStatus determineRequestStatus(Event event) {
-        return (!Boolean.TRUE.equals(event.getRequestModeration()) || event.getParticipantLimit() == 0)
-                ? RequestStatus.CONFIRMED
-                : RequestStatus.PENDING;
+        // Проверяем participantLimit, а не participant_limit
+        if (event.getParticipantLimit() == null || event.getParticipantLimit() == 0
+                || Boolean.FALSE.equals(event.getRequestModeration())) {
+            return RequestStatus.CONFIRMED;
+        }
+        return RequestStatus.PENDING;
     }
 
     private Event getEventWithCheck(Long userId, Long eventId) {
