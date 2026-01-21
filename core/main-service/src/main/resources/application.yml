@@ -1,27 +1,186 @@
 server:
-  port: 0
+  port: 0  # Случайный порт согласно требованиям
+  servlet:
+    context-path: /api  # Добавляем префикс для API
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+  tomcat:
+    max-threads: 200  # Оптимизация для Tomcat
+    min-spare-threads: 10
+    connection-timeout: 5000
 
 spring:
   sql:
     init:
       mode: always
       schema-locations: classpath:schema.sql
+      continue-on-error: false  # Останавливаться при ошибке инициализации
   application:
     name: main-service
   config:
     import: "configserver:"
+    fail-fast: false  # Продолжать работу при недоступности config server
   cloud:
     config:
       discovery:
         enabled: true
         service-id: config-server
       fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 2000
+        multiplier: 1.5
+  datasource:
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+      pool-name: MainServiceHikariCP
+    initialization-mode: always  # Явное указание режима инициализации
+  jpa:
+    open-in-view: false  # Отключаем для предотвращения проблем с производительностью
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        generate_statistics: false  # Отключаем в production
+        query:
+          in_clause_parameter_padding: true  # Оптимизация IN запросов
+      javax:
+        persistence:
+          validation:
+            mode: none  # Валидация через Bean Validation
+    hibernate:
+      ddl-auto: validate  # Только валидация схемы
+  mvc:
+    format:
+      date-time: yyyy-MM-dd HH:mm:ss
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: UTC
+    default-property-inclusion: non_null  # Не сериализуем null поля
+    deserialization:
+      fail-on-unknown-properties: false  # Игнорируем неизвестные свойства
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  lifecycle:
+    timeout-per-shutdown-phase: 30s  # Таймаут для graceful shutdown
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,env,beans  # Добавляем метрики для мониторинга
+      base-path: /manage  # Отдельный путь для management endpoints
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true  # Kubernetes health probes
+      group:
+        readiness:
+          include: db,diskSpace,eureka
+        liveness:
+          include: ping
+    metrics:
+      enabled: true
+      export:
+        prometheus:
+          enabled: true
+    info:
+      enabled: true
+  info:
+    env:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true  # Гистограмма для HTTP метрик
 
 eureka:
   client:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
+    healthcheck:
+      enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+    registry-fetch-interval-seconds: 30
+    instance-info-replication-interval-seconds: 30
   instance:
     preferIpAddress: true
-    instance-id: ${spring.application.name}:${random.int[10000,99999]}
-    lease-renewal-interval-in-seconds: 10
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+    hostname: ${HOSTNAME:localhost}
+    metadata-map:
+      instanceId: ${spring.application.instance_id:${random.value}}
+      port: ${server.port}  # Сохраняем случайный порт в метаданных
+      management.port: ${server.port}  # Management на том же порту
+
+# Настройки логирования с учетом случайного порта
+logging:
+  level:
+    ru.practicum: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE  # Для отладки параметров SQL
+    org.springframework.web: INFO
+    org.springframework.cloud: INFO
+    org.springframework.retry: DEBUG
+    com.netflix.eureka: WARN  # Уменьшаем логи Eureka
+    com.netflix.discovery: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [port:${server.port}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [port:${server.port}] - %msg%n"
+  file:
+    name: logs/main-service-${server.port}.log  # Логи с номером порта в имени файла
+    max-size: 10MB
+    max-history: 30
+  logback:
+    rollingpolicy:
+      max-history: 30
+      clean-history-on-start: false
+
+# Кастомные настройки приложения
+app:
+  name: Explore With Me Main Service
+  version: 0.0.1
+  description: Основной сервис для управления событиями
+  stats:
+    enabled: true
+    batch-size: 100  # Размер батча для отправки статистики
+    retry-attempts: 3  # Количество попыток повторной отправки
+    timeout-ms: 5000  # Таймаут для запросов к stats-server
+  events:
+    default-page-size: 10
+    max-page-size: 100
+  comments:
+    max-length: 2000
+    default-page-size: 20
+  validation:
+    request-timeout: 5000  # Таймаут для валидации запросов
+
+# Graceful shutdown настройки
+spring.lifecycle.timeout-per-shutdown-phase: 30s
