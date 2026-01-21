@@ -1,0 +1,29 @@
+spring:
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+          lower-case-service-id: true
+      routes:
+        - id: main-service-legacy
+          uri: lb://MAIN-SERVICE
+          predicates:
+            - Path=/admin/**,/users/**,/events/**,/categories/**,/compilations/**,/comments/**
+          filters:
+            - StripPrefix=0
+        - id: stats-service-legacy
+          uri: lb://STATS-SERVER
+          predicates:
+            - Path=/stats/**,/hit/**
+          filters:
+            - StripPrefix=0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,routes
+  endpoint:
+    gateway:
+      enabled: true
