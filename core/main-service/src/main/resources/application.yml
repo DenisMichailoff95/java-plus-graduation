@@ -16,13 +16,6 @@ spring:
       schema-locations: classpath:schema.sql
   application:
     name: main-service
-  config:
-    import: "optional:configserver:"
-  cloud:
-    config:
-      enabled: false
-      import-check:
-        enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5432/ewm
     username: ewm
@@ -66,7 +59,7 @@ management:
 
 eureka:
   client:
-    enabled: true  # Включаем Eureka для регистрации
+    enabled: true
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
     healthcheck:
@@ -97,4 +90,4 @@ app:
   stats:
     enabled: true
     server:
-      url: http://localhost:9090  # Локальный адрес stats-server
+      url: http://stats-server:9090  # Используем имя сервиса из Eureka

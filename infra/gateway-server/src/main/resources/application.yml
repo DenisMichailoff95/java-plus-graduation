@@ -4,20 +4,45 @@ server:
 spring:
   application:
     name: gateway-server
-  config:
-    import: "configserver:"
   cloud:
-    config:
+    gateway:
       discovery:
-        enabled: true
-        service-id: config-server
-      fail-fast: false
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: main-service
+          uri: lb://MAIN-SERVICE
+          predicates:
+            - Path=/admin/**,/users/**,/events/**,/categories/**,/compilations/**,/comments/**
+          filters:
+            - StripPrefix=0
+        - id: stats-service
+          uri: lb://STATS-SERVER
+          predicates:
+            - Path=/stats/**,/hit/**
+          filters:
+            - StripPrefix=0
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 10000
 
 eureka:
   client:
-    serviceUrl:
+    enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+    service-url:
       defaultZone: http://localhost:8761/eureka/
   instance:
     preferIpAddress: true
     instance-id: ${spring.application.name}:${server.port}
-    lease-renewal-interval-in-seconds: 10
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    reactor.netty.http.client: INFO
+    ru.practicum: INFO
+    org.springframework.cloud.loadbalancer: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %-40.40logger{39} : %msg%n"

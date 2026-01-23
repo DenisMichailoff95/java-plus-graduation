@@ -8,11 +8,6 @@ spring:
       schema-locations: classpath:schema.sql
   application:
     name: stats-server
-  config:
-    import: optional:configserver:http://localhost:8888
-  cloud:
-    config:
-      enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5433/stats
     username: test
@@ -46,7 +41,7 @@ management:
 
 eureka:
   client:
-    enabled: true  # Включаем Eureka для stats-server
+    enabled: true
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
   instance:
@@ -59,3 +54,8 @@ logging:
     org.springframework: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Убраны конфликтующие настройки:
+# - Убрано spring.config.import
+# - Убрано spring.cloud.config.enabled
+# - Убрана настройка stats.server.url (будет через Eureka)
