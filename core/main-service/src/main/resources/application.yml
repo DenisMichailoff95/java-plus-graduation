@@ -17,7 +17,7 @@ spring:
   application:
     name: main-service
   config:
-    import: optional:configserver:  # Добавлено для отключения проверки
+    import: "optional:configserver:"  # В кавычках!
   cloud:
     config:
       enabled: false  # Явно отключаем Config Server

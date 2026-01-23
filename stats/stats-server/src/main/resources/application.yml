@@ -9,7 +9,7 @@ spring:
   application:
     name: stats-server
   config:
-    import: optional:configserver:  # Добавлено для отключения проверки
+    import: "optional:configserver:"  # В кавычках!
   cloud:
     config:
       enabled: false  # Явно отключаем Config Server
@@ -45,6 +45,8 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: false
 
 eureka:
   client:
