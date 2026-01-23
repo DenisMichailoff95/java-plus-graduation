@@ -8,6 +8,13 @@ spring:
       schema-locations: classpath:schema.sql
   application:
     name: stats-server
+  config:
+    import: optional:configserver:  # Добавлено для отключения проверки
+  cloud:
+    config:
+      enabled: false  # Явно отключаем Config Server
+      import-check:
+        enabled: false  # Отключаем проверку импорта
   datasource:
     url: jdbc:postgresql://localhost:5433/stats
     username: test
@@ -54,8 +61,3 @@ logging:
     org.springframework: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-
-# Убраны конфликтующие настройки:
-# - Убрано spring.config.import
-# - Убрано spring.cloud.config.enabled
-# - Убрана настройка stats.server.url (будет через Eureka)

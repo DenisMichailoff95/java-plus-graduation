@@ -16,6 +16,13 @@ spring:
       schema-locations: classpath:schema.sql
   application:
     name: main-service
+  config:
+    import: optional:configserver:  # Добавлено для отключения проверки
+  cloud:
+    config:
+      enabled: false  # Явно отключаем Config Server
+      import-check:
+        enabled: false  # Отключаем проверку импорта
   datasource:
     url: jdbc:postgresql://localhost:5432/ewm
     username: ewm
@@ -90,4 +97,4 @@ app:
   stats:
     enabled: true
     server:
-      url: http://stats-server:9090  # Используем имя сервиса из Eureka
+      url: http://stats-server  # Используем имя сервиса из Eureka
