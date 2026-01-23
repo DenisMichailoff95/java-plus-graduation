@@ -4,7 +4,13 @@ server:
 spring:
   application:
     name: gateway-server
+  config:
+    import: "optional:configserver:"  # Добавлено для отключения проверки
   cloud:
+    config:
+      enabled: false  # Явно отключаем Config Server
+      import-check:
+        enabled: false  # Отключаем проверку импорта
     gateway:
       discovery:
         locator:
@@ -37,6 +43,20 @@ eureka:
   instance:
     preferIpAddress: true
     instance-id: ${spring.application.name}:${server.port}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,routes
+      base-path: /actuator
+  endpoint:
+    gateway:
+      enabled: true
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: false
 
 logging:
   level:
