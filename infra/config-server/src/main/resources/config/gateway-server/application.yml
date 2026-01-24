@@ -3,15 +3,14 @@ spring:
     gateway:
       discovery.locator.enabled: true
       routes:
-        # Comment Service - ИСПРАВЛЕНО
-      - id: comment_service_route
-        uri: lb://comment-service
-        predicates:
-          - Path=/admin/comments,/admin/comments/**
-          - Path=/users/{userId}/comments/**
-          - Path=/users/{userId}/events/{eventId}/comments/**
-          - Path=/events/{eventId}/comments/**
-          - Path=/events/{eventId}/comments/{commentId}
+        - id: comment_service_route
+          uri: lb://comment-service
+          predicates:
+            - Path=/admin/comments, /admin/comments/**,
+              /users/{userId}/comments/**,
+              /users/{userId}/events/{eventId}/comments/**,
+              /events/{eventId}/comments/**,
+              /events/{eventId}/comments/{commentId}
 
         # Request Service
         - id: request_service_route
