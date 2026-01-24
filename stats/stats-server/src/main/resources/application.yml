@@ -1,5 +1,5 @@
 server:
-  port: 0  # Случайный порт согласно требованиям
+  port: 0
 
 spring:
   sql:
@@ -9,57 +9,19 @@ spring:
   application:
     name: stats-server
   config:
-    import: "optional:configserver:"  # В кавычках!
+    import: "configserver:"
   cloud:
     config:
-      enabled: false  # Явно отключаем Config Server
-      import-check:
-        enabled: false  # Отключаем проверку импорта
-  datasource:
-    url: jdbc:postgresql://localhost:5433/stats
-    username: test
-    password: test
-    hikari:
-      connection-timeout: 30000
-      maximum-pool-size: 8
-      minimum-idle: 3
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-  mvc:
-    format:
-      date-time: yyyy-MM-dd HH:mm:ss
-  jackson:
-    date-format: yyyy-MM-dd HH:mm:ss
-    time-zone: UTC
-    default-property-inclusion: always
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      show-details: when-authorized
-      probes:
-        enabled: false
+      discovery:
+        enabled: true
+        service-id: config-server
+      fail-fast: false
 
 eureka:
   client:
-    enabled: true
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
   instance:
     preferIpAddress: true
-    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
-
-logging:
-  level:
-    ru.practicum: INFO
-    org.springframework: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    instance-id: ${spring.application.name}:${random.int[10000,99999]}
+    lease-renewal-interval-in-seconds: 10

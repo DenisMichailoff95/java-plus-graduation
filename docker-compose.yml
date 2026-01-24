@@ -1,92 +1,347 @@
 version: '3.8'
 
 services:
-  ewm-db:
-    image: postgres:16.1-alpine  # Используем alpine для меньшего размера
-    container_name: ewm-postgres
+  # Discovery Server
+  discovery-server:
+    image: openjdk:21-jdk-slim
+    container_name: discovery-server
     ports:
-      - "5432:5432"
+      - "8761:8761"
     environment:
-      - POSTGRES_PASSWORD=ewm
-      - POSTGRES_USER=ewm
-      - POSTGRES_DB=ewm
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C  # Явно задаём кодировку
+      - SPRING_PROFILES_ACTIVE=docker
     volumes:
-      - postgres_ewm_data:/var/lib/postgresql/data
-      - ./core/main-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro  # Автоматическое создание схемы
+      - ./infra/discovery-server/target/discovery-server-0.0.1-SNAPSHOT.jar:/app.jar
+    command: ["java", "-jar", "/app.jar"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d ewm"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
-      - ewm-network
-    labels:
-      - "com.practicum.service=database"
-      - "com.practicum.project=explore-with-me"
+      - explore-network
 
-  stats-db:
-    image: postgres:16.1-alpine  # Используем alpine для меньшего размера
-    container_name: stats-postgres
+  # Config Server
+  config-server:
+    image: openjdk:21-jdk-slim
+    container_name: config-server
     ports:
-      - "5433:5432"
+      - "8888:8888"
     environment:
-      - POSTGRES_PASSWORD=test
-      - POSTGRES_USER=test
-      - POSTGRES_DB=stats
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C  # Явно задаём кодировку
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
     volumes:
-      - postgres_stats_data:/var/lib/postgresql/data
-      - ./stats/stats-server/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro  # Автоматическое создание схемы
+      - ./infra/config-server/target/config-server-0.0.1-SNAPSHOT.jar:/app.jar
+      - ./infra/config-server/src/main/resources/config:/config
+    command: ["java", "-jar", "/app.jar"]
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - explore-network
+
+  # API Gateway
+  gateway-server:
+    image: openjdk:21-jdk-slim
+    container_name: gateway-server
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+    volumes:
+      - ./infra/gateway-server/target/gateway-server-0.0.1-SNAPSHOT.jar:/app.jar
+    command: ["java", "-jar", "/app.jar"]
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - explore-network
+
+  # PostgreSQL Alpine контейнеры
+  stats-db:
+    image: postgres:16-alpine
+    container_name: stats-db
+    ports:
+      - "5436:5432"
+    volumes:
+      - ./volumes/postgres/stats_data:/var/lib/postgresql/data
+      - ./stats/stats-server/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - POSTGRES_DB=stats
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U test -d stats"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
     networks:
-      - ewm-network
-    labels:
-      - "com.practicum.service=database"
-      - "com.practicum.project=explore-with-me"
+      - explore-network
+    command: >
+      postgres 
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
 
-volumes:
-  postgres_ewm_data:
-    name: ewm-postgres-data
-    labels:
-      - "com.practicum.service=database"
-      - "com.practicum.project=explore-with-me"
-  postgres_stats_data:
-    name: stats-postgres-data
-    labels:
-      - "com.practicum.service=database"
-      - "com.practicum.project=explore-with-me"
+  comment-db:
+    image: postgres:16-alpine
+    container_name: comment-db
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_DB=comment_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+    volumes:
+      - ./volumes/postgres/comment_data:/var/lib/postgresql/data
+      - ./core/comment-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ewm -d comment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - explore-network
+
+  event-db:
+    image: postgres:16-alpine
+    container_name: event-db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=event_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+    volumes:
+      - ./volumes/postgres/event_data:/var/lib/postgresql/data
+      - ./core/event-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ewm -d event_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - explore-network
+
+  request-db:
+    image: postgres:16-alpine
+    container_name: request-db
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_DB=request_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+    volumes:
+      - ./volumes/postgres/request_data:/var/lib/postgresql/data
+      - ./core/request-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ewm -d request_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - explore-network
+
+  user-db:
+    image: postgres:16-alpine
+    container_name: user-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=user_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+    volumes:
+      - ./volumes/postgres/user_data:/var/lib/postgresql/data
+      - ./core/user-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ewm -d user_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - explore-network
+
+  # Микросервисы
+  stats-server:
+    image: openjdk:21-jdk-slim
+    container_name: stats-server
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stats
+      - SPRING_DATASOURCE_USERNAME=test
+      - SPRING_DATASOURCE_PASSWORD=test
+    volumes:
+      - ./stats/stats-server/target/stats-server-0.0.1-SNAPSHOT.jar:/app.jar
+    command: ["java", "-jar", "/app.jar"]
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      stats-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - explore-network
+
+  user-service:
+    image: openjdk:21-jdk-slim
+    container_name: user-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/user_db
+      - SPRING_DATASOURCE_USERNAME=ewm
+      - SPRING_DATASOURCE_PASSWORD=ewm
+    volumes:
+      - ./core/user-service/target/user-service-0.0.1-SNAPSHOT.jar:/app.jar
+    command: ["java", "-jar", "/app.jar"]
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      user-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - explore-network
+
+  event-service:
+    image: openjdk:21-jdk-slim
+    container_name: event-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://event-db:5432/event_db
+      - SPRING_DATASOURCE_USERNAME=ewm
+      - SPRING_DATASOURCE_PASSWORD=ewm
+    volumes:
+      - ./core/event-service/target/event-service-0.0.1-SNAPSHOT.jar:/app.jar
+    command: ["java", "-jar", "/app.jar"]
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      event-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - explore-network
+
+  request-service:
+    image: openjdk:21-jdk-slim
+    container_name: request-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://request-db:5432/request_db
+      - SPRING_DATASOURCE_USERNAME=ewm
+      - SPRING_DATASOURCE_PASSWORD=ewm
+    volumes:
+      - ./core/request-service/target/request-service-0.0.1-SNAPSHOT.jar:/app.jar
+    command: ["java", "-jar", "/app.jar"]
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      request-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - explore-network
+
+  comment-service:
+    image: openjdk:21-jdk-slim
+    container_name: comment-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://comment-db:5432/comment_db
+      - SPRING_DATASOURCE_USERNAME=ewm
+      - SPRING_DATASOURCE_PASSWORD=ewm
+    volumes:
+      - ./core/comment-service/target/comment-service-0.0.1-SNAPSHOT.jar:/app.jar
+    command: ["java", "-jar", "/app.jar"]
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      comment-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - explore-network
 
 networks:
-  ewm-network:
-    name: ewm-network
+  explore-network:
     driver: bridge
     ipam:
       config:
         - subnet: 172.20.0.0/16
-    labels:
-      - "com.practicum.project=explore-with-me"

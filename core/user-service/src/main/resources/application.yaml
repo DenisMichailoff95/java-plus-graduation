@@ -1,0 +1,27 @@
+server:
+  port: 0
+
+spring:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  application:
+    name: user-service
+  config:
+    import: "configserver:"
+  cloud:
+    config:
+      discovery:
+        enabled: true
+        service-id: config-server
+      fail-fast: false
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    preferIpAddress: true
+    instance-id: ${spring.application.name}:${random.int[10000,99999]}
+    lease-renewal-interval-in-seconds: 10
