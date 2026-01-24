@@ -13,11 +13,12 @@
     <version>0.0.1-SNAPSHOT</version>
     <name>stats-dto</name>
     <description>stats-dto</description>
-    <packaging>jar</packaging> <!-- ЯВНО УКАЗАТЬ JAR -->
+    <packaging>jar</packaging>
 
     <properties>
         <java.version>21</java.version>
     </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
