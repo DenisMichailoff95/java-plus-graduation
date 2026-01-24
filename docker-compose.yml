@@ -1,6 +1,6 @@
 services:
   stats-db:
-    image: postgres:16.1
+    image: postgres:16.1-alpine
     container_name: stats-db
     ports:
       - "5436:5432"
@@ -17,7 +17,7 @@ services:
       retries: 10
 
   comment-db:
-    image: postgres:16.1
+    image: postgres:16.1-alpine
     container_name: comment-db
     ports:
       - "5435:5432"
@@ -34,7 +34,7 @@ services:
       retries: 10
 
   event-db:
-    image: postgres:16.1
+    image: postgres:16.1-alpine
     container_name: event-db
     ports:
       - "5433:5432"
@@ -51,7 +51,7 @@ services:
       retries: 10
 
   request-db:
-    image: postgres:16.1
+    image: postgres:16.1-alpine
     container_name: request-db
     ports:
       - "5434:5432"
@@ -68,7 +68,7 @@ services:
       retries: 10
 
   user-db:
-    image: postgres:16.1
+    image: postgres:16.1-alpine
     container_name: user-db
     ports:
       - "5432:5432"
