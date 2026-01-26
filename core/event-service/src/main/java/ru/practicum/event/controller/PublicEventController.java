@@ -10,6 +10,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.event.EventDtoOut;
 import ru.practicum.dto.event.EventShortDtoOut;
+import ru.practicum.dto.EndpointHitDTO;
 import ru.practicum.enums.EventState;
 import ru.practicum.event.model.EventFilter;
 import ru.practicum.event.service.EventService;
@@ -78,7 +79,14 @@ public class PublicEventController {
 
             // Отправляем хит для списка событий
             String listUri = request.getRequestURI() + (request.getQueryString() != null ? "?" + request.getQueryString() : "");
-            eventStatsClient.saveHit(listUri, clientIp);
+
+            EndpointHitDTO listHitDto = EndpointHitDTO.builder()
+                    .app("event-service")
+                    .uri(listUri)
+                    .ip(clientIp)
+                    .timestamp(timestamp)
+                    .build();
+            eventStatsClient.saveHit(listHitDto);
 
             log.debug("Sent hit for events list: uri={}, ip={}", listUri, clientIp);
         }
@@ -99,7 +107,14 @@ public class PublicEventController {
         String uri = "/events/" + eventId;
 
         log.info("Sending hit for event {} from IP: {}", eventId, clientIp);
-        eventStatsClient.saveHit(uri, clientIp);
+
+        EndpointHitDTO eventHitDto = EndpointHitDTO.builder()
+                .app("event-service")
+                .uri(uri)
+                .ip(clientIp)
+                .timestamp(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+                .build();
+        eventStatsClient.saveHit(eventHitDto);
 
         return dtoOut;
     }

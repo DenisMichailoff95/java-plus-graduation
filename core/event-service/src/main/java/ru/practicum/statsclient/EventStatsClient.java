@@ -5,7 +5,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -13,9 +18,15 @@ import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.dto.EndpointHitDTO;
 import ru.practicum.dto.ViewStatsDTO;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -23,22 +34,18 @@ import java.util.*;
 public class EventStatsClient {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final String STATS_SERVICE_NAME = "stats-server";
-    private static final String APP_NAME = "ewm-main-service";
 
-    // Используем LoadBalanced RestTemplate для работы с Eureka
-    @Qualifier("loadBalancedRestTemplate")
+    @Qualifier("simpleRestTemplate")
     private final RestTemplate restTemplate;
 
-    @Value("${stats.client.connect-timeout:3000}")
+    @Value("${stats.client.connect-timeout:1000}")
     private int connectTimeout;
 
-    @Value("${stats.client.read-timeout:5000}")
+    @Value("${stats.client.read-timeout:2000}")
     private int readTimeout;
 
     @PostConstruct
     public void init() {
-        // Настраиваем таймауты
         if (restTemplate.getRequestFactory() instanceof HttpComponentsClientHttpRequestFactory) {
             HttpComponentsClientHttpRequestFactory requestFactory =
                     (HttpComponentsClientHttpRequestFactory) restTemplate.getRequestFactory();
@@ -46,18 +53,26 @@ public class EventStatsClient {
             requestFactory.setReadTimeout(readTimeout);
             log.debug("EventStatsClient timeouts set: connect={}ms, read={}ms", connectTimeout, readTimeout);
         }
-
-        log.info("EventStatsClient initialized using service name: {}", STATS_SERVICE_NAME);
-    }
-
-    public void saveHit(String uri, String ip) {
-        EndpointHitDTO hit = createHit(uri, ip);
-        saveHit(hit);
     }
 
     public void saveHit(EndpointHitDTO endpointHitDTO) {
-        String url = String.format("http://%s/hit", STATS_SERVICE_NAME);
-        executePostRequest(url, endpointHitDTO, Void.class, "Failed to save hit");
+        try {
+            String url = "http://STATS-SERVER/hit";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<EndpointHitDTO> requestEntity = new HttpEntity<>(endpointHitDTO, headers);
+
+            log.debug("Sending hit to stats server: {}", endpointHitDTO);
+
+            ResponseEntity<Void> response = restTemplate.exchange(
+                    url, HttpMethod.POST, requestEntity, Void.class);
+
+            log.debug("Hit successfully sent. Status: {}", response.getStatusCode());
+
+        } catch (Exception e) {
+            log.error("Failed to save hit to stats server: {}", e.getMessage());
+        }
     }
 
     public void saveHits(List<EndpointHitDTO> hits) {
@@ -65,13 +80,26 @@ public class EventStatsClient {
             return;
         }
 
-        String url = String.format("http://%s/hit/batch", STATS_SERVICE_NAME);
         try {
-            executePostRequest(url, hits, Void.class, "Failed to save batch hits");
-            log.debug("Batch of {} hits sent successfully", hits.size());
+            String url = "http://STATS-SERVER/hit/batch";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<List<EndpointHitDTO>> requestEntity = new HttpEntity<>(hits, headers);
+
+            log.debug("Sending batch of {} hits to stats server", hits.size());
+
+            ResponseEntity<Void> response = restTemplate.exchange(
+                    url, HttpMethod.POST, requestEntity, Void.class);
+
+            log.debug("Batch hits sent successfully. Status: {}", response.getStatusCode());
+
         } catch (Exception e) {
-            log.warn("Batch save failed, saving individually: {}", e.getMessage());
-            hits.forEach(this::saveHit);
+            log.warn("Batch save failed: {}", e.getMessage());
+
+            for (EndpointHitDTO hit : hits) {
+                saveHit(hit);
+            }
         }
     }
 
@@ -81,118 +109,51 @@ public class EventStatsClient {
         }
 
         try {
-            LocalDateTime start = LocalDateTime.now().minusYears(1); // Берем статистику за последний год
-            LocalDateTime end = LocalDateTime.now().plusHours(1); // Добавляем час на всякий случай
-
-            // Создаем список URI для событий
-            List<String> uris = new ArrayList<>();
-            for (Long eventId : eventIds) {
-                uris.add("/events/" + eventId);
-            }
-
-            String url = String.format("http://%s/stats", STATS_SERVICE_NAME);
+            LocalDateTime start = LocalDateTime.now().minusYears(10);
+            LocalDateTime end = LocalDateTime.now().plusYears(10);
 
             UriComponentsBuilder uriBuilder = UriComponentsBuilder
-                    .fromHttpUrl(url)
+                    .fromHttpUrl("http://STATS-SERVER")
+                    .path("/stats")
                     .queryParam("start", FORMATTER.format(start))
                     .queryParam("end", FORMATTER.format(end))
-                    .queryParam("unique", false); // false = все просмотры, true = уникальные по IP
+                    .queryParam("unique", true);
 
-            // Добавляем URI как отдельные параметры
-            for (String uri : uris) {
-                uriBuilder.queryParam("uris", uri);
-            }
+            eventIds.forEach(eventId ->
+                    uriBuilder.queryParam("uris", "/events/" + eventId));
 
-            String fullUrl = uriBuilder.toUriString();
-            log.debug("Getting stats from: {}", fullUrl);
+            URI uri = uriBuilder.build().toUri();
+            log.debug("Getting stats from: {}", uri);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
             ResponseEntity<ViewStatsDTO[]> response = restTemplate.exchange(
-                    fullUrl, HttpMethod.GET, new HttpEntity<>(createJsonHeaders()), ViewStatsDTO[].class);
+                    uri, HttpMethod.GET, requestEntity, ViewStatsDTO[].class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return processStatsResponse(eventIds, response.getBody());
-            } else {
-                log.warn("Stats request returned status: {}", response.getStatusCode());
-            }
-
-        } catch (Exception e) {
-            log.warn("Failed to get stats from stats server: {}", e.getMessage());
-            log.debug("Stack trace:", e);
-        }
-
-        // Возвращаем мапу с нулевыми просмотрами при ошибке
-        return createDefaultViewsMap(eventIds);
-    }
-
-    public Long getViewsForEvent(Long eventId) {
-        Map<Long, Long> views = getViewsForEvents(List.of(eventId));
-        return views.getOrDefault(eventId, 0L);
-    }
-
-    private EndpointHitDTO createHit(String uri, String ip) {
-        return EndpointHitDTO.builder()
-                .app(APP_NAME)
-                .uri(uri)
-                .ip(ip)
-                .timestamp(LocalDateTime.now().format(FORMATTER))
-                .build();
-    }
-
-    private <T> void executePostRequest(String url, Object body, Class<T> responseType, String errorMessage) {
-        try {
-            HttpHeaders headers = createJsonHeaders();
-            HttpEntity<Object> requestEntity = new HttpEntity<>(body, headers);
-
-            log.debug("Sending POST request to {} with body: {}", url, body);
-
-            ResponseEntity<T> response = restTemplate.exchange(
-                    url, HttpMethod.POST, requestEntity, responseType);
-
-            log.debug("Request successful. Status: {}", response.getStatusCode());
-
-        } catch (Exception e) {
-            log.warn("{} ({}): {}", errorMessage, url, e.getMessage());
-        }
-    }
-
-    private HttpHeaders createJsonHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-        return headers;
-    }
-
-    private Map<Long, Long> processStatsResponse(List<Long> eventIds, ViewStatsDTO[] stats) {
-        Map<Long, Long> viewsMap = new HashMap<>();
-
-        if (stats != null) {
-            for (ViewStatsDTO stat : stats) {
-                if (stat != null && stat.getUri() != null && stat.getUri().startsWith("/events/")) {
+                Map<Long, Long> viewsMap = new HashMap<>();
+                for (ViewStatsDTO stat : response.getBody()) {
                     try {
                         Long eventId = Long.parseLong(stat.getUri().replace("/events/", ""));
-                        viewsMap.put(eventId, stat.getHits() != null ? stat.getHits() : 0L);
+                        viewsMap.put(eventId, stat.getHits());
                     } catch (NumberFormatException e) {
-                        log.warn("Invalid event ID in URI: {}", stat.getUri());
+                        continue;
                     }
                 }
+
+                for (Long eventId : eventIds) {
+                    viewsMap.putIfAbsent(eventId, 0L);
+                }
+
+                return viewsMap;
             }
+
+        } catch (Exception e) {
+            log.error("Failed to get stats from stats server: {}", e.getMessage());
         }
 
-        // Заполняем нулями для событий без статистики
-        for (Long eventId : eventIds) {
-            viewsMap.putIfAbsent(eventId, 0L);
-        }
-
-        log.debug("Processed stats for {} events, found {} with views", eventIds.size(), viewsMap.size());
-        return viewsMap;
-    }
-
-    private Map<Long, Long> createDefaultViewsMap(List<Long> eventIds) {
-        Map<Long, Long> defaultMap = new HashMap<>();
-        for (Long eventId : eventIds) {
-            defaultMap.put(eventId, 0L);
-        }
-        log.debug("Created default views map for {} events", eventIds.size());
-        return defaultMap;
+        return eventIds.stream().collect(Collectors.toMap(id -> id, id -> 0L));
     }
 }
