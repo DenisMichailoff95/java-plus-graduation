@@ -412,6 +412,17 @@ public class EventServiceImpl implements EventService {
                 .toList();
     }
 
+    private void enrichEventWithViews(Event event) {
+        try {
+            Long views = eventStatsClient.getViewsForEvent(event.getId());
+            event.setViews(views != null ? views : 0L);
+            log.debug("Event {} has {} views", event.getId(), event.getViews());
+        } catch (Exception e) {
+            log.warn("Failed to get views for event {}: {}", event.getId(), e.getMessage());
+            event.setViews(0L);
+        }
+    }
+
     private void enrichEventsWithViews(List<Event> events) {
         if (events.isEmpty()) {
             return;

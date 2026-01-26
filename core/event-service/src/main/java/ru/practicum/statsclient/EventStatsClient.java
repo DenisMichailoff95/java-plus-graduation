@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.http.*;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -17,7 +16,6 @@ import ru.practicum.dto.ViewStatsDTO;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -26,6 +24,7 @@ public class EventStatsClient {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String STATS_SERVICE_NAME = "stats-server";
+    private static final String APP_NAME = "ewm-main-service";
 
     // Используем LoadBalanced RestTemplate для работы с Eureka
     @Qualifier("loadBalancedRestTemplate")
@@ -49,6 +48,11 @@ public class EventStatsClient {
         }
 
         log.info("EventStatsClient initialized using service name: {}", STATS_SERVICE_NAME);
+    }
+
+    public void saveHit(String uri, String ip) {
+        EndpointHitDTO hit = createHit(uri, ip);
+        saveHit(hit);
     }
 
     public void saveHit(EndpointHitDTO endpointHitDTO) {
@@ -77,12 +81,14 @@ public class EventStatsClient {
         }
 
         try {
-            LocalDateTime start = LocalDateTime.now().minusYears(10);
-            LocalDateTime end = LocalDateTime.now().plusYears(10);
+            LocalDateTime start = LocalDateTime.now().minusYears(1); // Берем статистику за последний год
+            LocalDateTime end = LocalDateTime.now().plusHours(1); // Добавляем час на всякий случай
 
-            List<String> uriList = eventIds.stream()
-                    .map(id -> "/events/" + id)
-                    .collect(Collectors.toList());
+            // Создаем список URI для событий
+            List<String> uris = new ArrayList<>();
+            for (Long eventId : eventIds) {
+                uris.add("/events/" + eventId);
+            }
 
             String url = String.format("http://%s/stats", STATS_SERVICE_NAME);
 
@@ -90,20 +96,23 @@ public class EventStatsClient {
                     .fromHttpUrl(url)
                     .queryParam("start", FORMATTER.format(start))
                     .queryParam("end", FORMATTER.format(end))
-                    .queryParam("unique", true);
+                    .queryParam("unique", false); // false = все просмотры, true = уникальные по IP
 
-            // Добавляем каждый URI отдельным параметром
-            for (String uri : uriList) {
+            // Добавляем URI как отдельные параметры
+            for (String uri : uris) {
                 uriBuilder.queryParam("uris", uri);
             }
 
             String fullUrl = uriBuilder.toUriString();
             log.debug("Getting stats from: {}", fullUrl);
 
-            ViewStatsDTO[] response = executeGetRequest(fullUrl, ViewStatsDTO[].class);
+            ResponseEntity<ViewStatsDTO[]> response = restTemplate.exchange(
+                    fullUrl, HttpMethod.GET, new HttpEntity<>(createJsonHeaders()), ViewStatsDTO[].class);
 
-            if (response != null) {
-                return processStatsResponse(eventIds, response);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return processStatsResponse(eventIds, response.getBody());
+            } else {
+                log.warn("Stats request returned status: {}", response.getStatusCode());
             }
 
         } catch (Exception e) {
@@ -113,6 +122,20 @@ public class EventStatsClient {
 
         // Возвращаем мапу с нулевыми просмотрами при ошибке
         return createDefaultViewsMap(eventIds);
+    }
+
+    public Long getViewsForEvent(Long eventId) {
+        Map<Long, Long> views = getViewsForEvents(List.of(eventId));
+        return views.getOrDefault(eventId, 0L);
+    }
+
+    private EndpointHitDTO createHit(String uri, String ip) {
+        return EndpointHitDTO.builder()
+                .app(APP_NAME)
+                .uri(uri)
+                .ip(ip)
+                .timestamp(LocalDateTime.now().format(FORMATTER))
+                .build();
     }
 
     private <T> void executePostRequest(String url, Object body, Class<T> responseType, String errorMessage) {
@@ -130,29 +153,6 @@ public class EventStatsClient {
         } catch (Exception e) {
             log.warn("{} ({}): {}", errorMessage, url, e.getMessage());
         }
-    }
-
-    private <T> T executeGetRequest(String url, Class<T> responseType) {
-        try {
-            HttpHeaders headers = createJsonHeaders();
-            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-
-            log.debug("Sending GET request to: {}", url);
-
-            ResponseEntity<T> response = restTemplate.exchange(
-                    url, HttpMethod.GET, requestEntity, responseType);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return response.getBody();
-            } else {
-                log.warn("GET request to {} returned status: {}", url, response.getStatusCode());
-            }
-
-        } catch (Exception e) {
-            log.warn("GET request failed for {}: {}", url, e.getMessage());
-        }
-
-        return null;
     }
 
     private HttpHeaders createJsonHeaders() {

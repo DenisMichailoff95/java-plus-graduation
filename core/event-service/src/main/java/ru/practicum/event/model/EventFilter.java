@@ -1,11 +1,6 @@
 package ru.practicum.event.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -16,7 +11,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static ru.practicum.constants.Constants.DATE_TIME_FORMAT;
-
 
 @Getter
 @Setter

@@ -32,11 +32,7 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     public List<CompilationDto> getCompilations(Boolean pinned, int from, int size) {
         Pageable pageable = PageRequest.of(from / size, size);
-
-        Page<Compilation> compilationsPage = (pinned != null)
-                ? compilationRepository.findByPinned(pinned, pageable)
-                : compilationRepository.findAll(pageable);
-
+        Page<Compilation> compilationsPage = getCompilationsPage(pinned, pageable);
         List<Compilation> compilations = compilationsPage.getContent();
 
         return compilations.stream()
@@ -54,9 +50,7 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     @Transactional
     public CompilationDto createCompilation(NewCompilationDto newCompilationDto) {
-        if (compilationRepository.existsByTitle(newCompilationDto.getTitle())) {
-            throw new ConditionNotMetException("A compilation with this title already exists");
-        }
+        validateCompilationTitleUniqueness(newCompilationDto.getTitle());
 
         Compilation compilation = CompilationMapper.toEntity(newCompilationDto);
         Compilation saved = compilationRepository.save(compilation);
@@ -77,6 +71,24 @@ public class CompilationServiceImpl implements CompilationService {
         Compilation compilation = compilationRepository.findById(compId)
                 .orElseThrow(() -> new NotFoundException("Compilation", compId));
 
+        updateCompilationFields(compilation, dto);
+        Compilation updated = compilationRepository.save(compilation);
+        return enrichCompilationWithEvents(updated);
+    }
+
+    private Page<Compilation> getCompilationsPage(Boolean pinned, Pageable pageable) {
+        return pinned != null
+                ? compilationRepository.findByPinned(pinned, pageable)
+                : compilationRepository.findAll(pageable);
+    }
+
+    private void validateCompilationTitleUniqueness(String title) {
+        if (compilationRepository.existsByTitle(title)) {
+            throw new ConditionNotMetException("A compilation with this title already exists");
+        }
+    }
+
+    private void updateCompilationFields(Compilation compilation, UpdateCompilationRequest dto) {
         if (dto.getTitle() != null) {
             compilation.setTitle(dto.getTitle());
         }
@@ -88,28 +100,25 @@ public class CompilationServiceImpl implements CompilationService {
         if (dto.getEvents() != null) {
             compilation.setEventIds(new HashSet<>(dto.getEvents()));
         }
-
-        Compilation updated = compilationRepository.save(compilation);
-        return enrichCompilationWithEvents(updated);
     }
 
     private CompilationDto enrichCompilationWithEvents(Compilation compilation) {
         CompilationDto dto = CompilationMapper.toDto(compilation);
+        dto.setEvents(getEventsForCompilation(compilation));
+        return dto;
+    }
 
-        if (compilation.getEventIds() != null && !compilation.getEventIds().isEmpty()) {
-            try {
-                List<EventShortDtoOut> events = eventClient.getEventsByIds(
-                        new ArrayList<>(compilation.getEventIds()));
-                dto.setEvents(events);
-            } catch (Exception e) {
-                log.warn("Event service unavailable for compilation {}, returning empty list: {}",
-                        compilation.getId(), e.getMessage());
-                dto.setEvents(List.of()); // пустой список при недоступности
-            }
-        } else {
-            dto.setEvents(List.of());
+    private List<EventShortDtoOut> getEventsForCompilation(Compilation compilation) {
+        if (compilation.getEventIds() == null || compilation.getEventIds().isEmpty()) {
+            return List.of();
         }
 
-        return dto;
+        try {
+            return eventClient.getEventsByIds(new ArrayList<>(compilation.getEventIds()));
+        } catch (Exception e) {
+            log.warn("Event service unavailable for compilation {}, returning empty list: {}",
+                    compilation.getId(), e.getMessage());
+            return List.of();
+        }
     }
 }
