@@ -1,5 +1,5 @@
 server:
-  port: 0
+  port: 0  # Динамический порт
 
 spring:
   sql:
@@ -9,13 +9,32 @@ spring:
   application:
     name: stats-server
   config:
-    import: "configserver:"
+    import: "optional:configserver:"
   cloud:
     config:
       discovery:
         enabled: true
         service-id: config-server
       fail-fast: false
+  datasource:
+    url: jdbc:postgresql://localhost:5436/stats
+    username: test
+    password: test
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  mvc:
+    format:
+      date-time: yyyy-MM-dd HH:mm:ss
 
 eureka:
   client:
@@ -25,3 +44,19 @@ eureka:
     preferIpAddress: true
     instance-id: ${spring.application.name}:${random.int[10000,99999]}
     lease-renewal-interval-in-seconds: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+logging:
+  level:
+    ru.practicum: DEBUG
+    org.hibernate.SQL: DEBUG
