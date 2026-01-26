@@ -1,5 +1,6 @@
 package ru.practicum.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +17,8 @@ public class RestTemplateConfig {
         return new RestTemplate();
     }
 
-    @Bean(name = "simpleRestTemplate")
+    @Bean
+    @Qualifier("simpleRestTemplate")
     public RestTemplate simpleRestTemplate() {
         return new RestTemplate();
     }

@@ -21,14 +21,6 @@ spring:
     format:
       date-time: yyyy-MM-dd HH:mm:ss
 
-# КОНФИГУРАЦИЯ ДЛЯ EventStatsClient
-stats:
-  server:
-    url: http://localhost:9090  # или http://stats-server если используете Eureka
-  client:
-    connect-timeout: 3000
-    read-timeout: 5000
-
 feign:
   circuitbreaker:
     enabled: true
@@ -63,4 +55,3 @@ logging:
   level:
     ru.practicum: DEBUG
     org.hibernate.SQL: DEBUG
-    ru.practicum.statsclient: DEBUG

@@ -7,10 +7,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import ru.practicum.dto.EndpointHitDTO;
 import ru.practicum.dto.event.EventDtoOut;
 import ru.practicum.dto.event.EventShortDtoOut;
-import ru.practicum.dto.EndpointHitDTO;
 import ru.practicum.enums.EventState;
 import ru.practicum.event.model.EventFilter;
 import ru.practicum.event.service.EventService;
@@ -20,6 +24,7 @@ import ru.practicum.statsclient.EventStatsClient;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static ru.practicum.constants.Constants.DATE_TIME_FORMAT;
 
@@ -48,9 +53,6 @@ public class PublicEventController {
             @RequestParam(defaultValue = "10") Integer size,
             HttpServletRequest request) {
 
-        log.info("Public request to get events: text={}, categories={}, from={}, size={}",
-                text, categories, from, size);
-
         EventFilter filter = EventFilter.builder()
                 .text(text)
                 .categories(categories)
@@ -72,24 +74,11 @@ public class PublicEventController {
 
         List<EventShortDtoOut> events = eventService.findShortEventsBy(filter);
 
-        // Отправляем статистику для списка событий
         if (!events.isEmpty()) {
-            String clientIp = getClientIp(request);
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-
-            // Отправляем хит для списка событий
-            String listUri = request.getRequestURI() + (request.getQueryString() != null ? "?" + request.getQueryString() : "");
-
-            EndpointHitDTO listHitDto = EndpointHitDTO.builder()
-                    .app("event-service")
-                    .uri(listUri)
-                    .ip(clientIp)
-                    .timestamp(timestamp)
-                    .build();
-            eventStatsClient.saveHit(listHitDto);
-
-            log.debug("Sent hit for events list: uri={}, ip={}", listUri, clientIp);
+            sendStatsForEvents(events, request);
         }
+
+        sendStatsForEventsList(request);
 
         return events;
     }
@@ -97,50 +86,72 @@ public class PublicEventController {
     @GetMapping("/{eventId}")
     public EventDtoOut get(@PathVariable @Min(1) Long eventId,
                            HttpServletRequest request) {
-        log.info("Public request to get event: id={}", eventId);
+        log.info("=== PUBLIC EVENT CONTROLLER: Processing event {} ===", eventId);
 
-        // Получаем событие
         EventDtoOut dtoOut = eventService.findPublished(eventId);
 
-        // Отправляем статистику
         String clientIp = getClientIp(request);
-        String uri = "/events/" + eventId;
+        String timestamp = LocalDateTime.now().format(FORMATTER);
 
-        log.info("Sending hit for event {} from IP: {}", eventId, clientIp);
-
-        EndpointHitDTO eventHitDto = EndpointHitDTO.builder()
-                .app("event-service")
-                .uri(uri)
+        EndpointHitDTO endpointHitDto = EndpointHitDTO.builder()
+                .app("ewm-main-service")
+                .uri("/events/" + eventId)
                 .ip(clientIp)
-                .timestamp(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+                .timestamp(timestamp)
                 .build();
-        eventStatsClient.saveHit(eventHitDto);
+
+        log.info("=== SENDING HIT to stats-server: {}", endpointHitDto);
+
+        eventStatsClient.saveHit(endpointHitDto);
+
+        log.info("=== HIT SENT ===");
 
         return dtoOut;
     }
 
+    private void sendStatsForEvents(List<EventShortDtoOut> events, HttpServletRequest request) {
+        String clientIp = getClientIp(request);
+        String timestamp = LocalDateTime.now().format(FORMATTER);
+
+        List<EndpointHitDTO> hits = events.stream()
+                .map(event -> EndpointHitDTO.builder()
+                        .app("ewm-main-service")
+                        .uri("/events/" + event.getId())
+                        .ip(clientIp)
+                        .timestamp(timestamp)
+                        .build())
+                .collect(Collectors.toList());
+
+        log.debug("Sending batch hits for {} events", hits.size());
+        eventStatsClient.saveHits(hits);
+    }
+
+    private void sendStatsForEventsList(HttpServletRequest request) {
+        String clientIp = getClientIp(request);
+        String timestamp = LocalDateTime.now().format(FORMATTER);
+
+        EndpointHitDTO listHit = EndpointHitDTO.builder()
+                .app("ewm-main-service")
+                .uri("/events")
+                .ip(clientIp)
+                .timestamp(timestamp)
+                .build();
+
+        log.debug("Sending hit for events list request");
+        eventStatsClient.saveHit(listHit);
+    }
+
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getHeader("Proxy-Client-IP");
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getHeader("WL-Proxy-Client-IP");
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getRemoteAddr();
         }
-
-        // Если несколько IP через запятую (цепочка прокси), берем первый
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-
-        // Для тестирования, если IP localhost, заменяем на тестовый
-        if (ip == null || ip.isEmpty() || "0:0:0:0:0:0:0:1".equals(ip) || "127.0.0.1".equals(ip)) {
-            ip = "192.168.1." + (int) (Math.random() * 255); // Генерируем тестовый IP
-        }
-
         return ip;
     }
 }
