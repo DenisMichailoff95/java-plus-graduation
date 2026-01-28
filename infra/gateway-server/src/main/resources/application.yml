@@ -17,6 +17,38 @@ spring:
         locator:
           enabled: false
           lower-case-service-id: true
+      # Явные маршруты (перенесены из Config Server)
+      routes:
+        - id: comment_service_route
+          uri: lb://comment-service
+          predicates:
+            - Path=/admin/comments, /admin/comments/**,
+              /users/{userId}/comments/**,
+              /users/{userId}/events/{eventId}/comments/**,
+              /events/{eventId}/comments/**,
+              /events/{eventId}/comments/{commentId}
+
+        # Request Service
+        - id: request_service_route
+          uri: lb://request-service
+          predicates:
+            - Path=/users/{userId}/events/{eventId}/requests/**,
+              /users/{userId}/requests/**
+
+        # Event Service
+        - id: event_service_route
+          uri: lb://event-service
+          predicates:
+            - Path=/admin/categories/**, /categories/**,
+              /admin/compilations/**, /compilations/**,
+              /admin/events/**, /users/{userId}/events/**,
+              /events/**
+
+        # User Service
+        - id: user_service_route
+          uri: lb://user-service
+          predicates:
+            - Path=/admin/users/**
 
 eureka:
   client:
