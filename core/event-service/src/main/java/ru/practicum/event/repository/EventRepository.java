@@ -29,4 +29,8 @@ public interface EventRepository extends JpaRepository<Event, Long>, JpaSpecific
 
     // Проверить существование события
     boolean existsById(Long id);
+
+    // Получить participantLimit события по ID
+    @Query("SELECT e.participantLimit FROM Event e WHERE e.id = :eventId")
+    Integer findParticipantLimitById(@Param("eventId") Long eventId);
 }

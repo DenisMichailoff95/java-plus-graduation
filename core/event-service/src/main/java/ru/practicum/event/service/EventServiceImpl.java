@@ -209,9 +209,47 @@ public class EventServiceImpl implements EventService {
 
         enrichEventsWithViews(events);
 
-        return enrichShortEventsWithExternalData(events);
+        List<EventShortDtoOut> result = enrichShortEventsWithExternalData(events);
+
+        // Фильтрация "только доступные" на уровне сервиса
+        if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
+            result = result.stream()
+                    .filter(event -> {
+                        // Получаем participantLimit из оригинального события
+                        Integer participantLimit = getParticipantLimitForEvent(event.getId());
+                        Integer confirmedRequests = event.getConfirmedRequests();
+
+                        // Если лимит не задан (0) или null, событие доступно
+                        if (participantLimit == null || participantLimit == 0) {
+                            return true;
+                        }
+
+                        // Проверяем, есть ли свободные места
+                        return confirmedRequests < participantLimit;
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // Применяем пагинацию после фильтрации
+        return applyPagination(result, filter.getFrom(), filter.getSize());
     }
 
+    private Integer getParticipantLimitForEvent(Long eventId) {
+        return eventRepository.findParticipantLimitById(eventId);
+    }
+
+    private List<EventShortDtoOut> applyPagination(List<EventShortDtoOut> events, int from, int size) {
+        if (events.isEmpty()) {
+            return events;
+        }
+
+        int toIndex = Math.min(from + size, events.size());
+        if (from >= events.size()) {
+            return List.of();
+        }
+
+        return events.subList(from, toIndex);
+    }
 
     @Override
     public List<EventDtoOut> findFullEventsBy(EventAdminFilter filter) {
@@ -360,7 +398,7 @@ public class EventServiceImpl implements EventService {
                         optionalSpec(EventSpecifications.withCategoriesIn(filter.getCategories())),
                         optionalSpec(EventSpecifications.withPaid(filter.getPaid())),
                         optionalSpec(EventSpecifications.withState(filter.getState())),
-                        optionalSpec(EventSpecifications.withOnlyAvailable(filter.getOnlyAvailable())),
+                        // Убрали вызов withOnlyAvailable из спецификаций, т.к. фильтрация теперь на уровне сервиса
                         optionalSpec(EventSpecifications.withRangeStart(filter.getRangeStart())),
                         optionalSpec(EventSpecifications.withRangeEnd(filter.getRangeEnd()))
                 )
