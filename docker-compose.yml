@@ -1,92 +1,85 @@
-version: '3.8'
-
 services:
-  ewm-db:
-    image: postgres:16.1-alpine  # Используем alpine для меньшего размера
-    container_name: ewm-postgres
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_PASSWORD=ewm
-      - POSTGRES_USER=ewm
-      - POSTGRES_DB=ewm
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C  # Явно задаём кодировку
-    volumes:
-      - postgres_ewm_data:/var/lib/postgresql/data
-      - ./core/main-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro  # Автоматическое создание схемы
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d ewm"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-    networks:
-      - ewm-network
-    labels:
-      - "com.practicum.service=database"
-      - "com.practicum.project=explore-with-me"
-
   stats-db:
-    image: postgres:16.1-alpine  # Используем alpine для меньшего размера
-    container_name: stats-postgres
+    image: postgres:16.1-alpine
+    container_name: stats-db
+    ports:
+      - "5436:5432"
+    volumes:
+      - ./volumes/postgres/stats_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=stats
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
+
+  comment-db:
+    image: postgres:16.1-alpine
+    container_name: comment-db
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_DB=comment_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+    volumes:
+      - ./volumes/postgres/comment_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
+
+  event-db:
+    image: postgres:16.1-alpine
+    container_name: event-db
     ports:
       - "5433:5432"
     environment:
-      - POSTGRES_PASSWORD=test
-      - POSTGRES_USER=test
-      - POSTGRES_DB=stats
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C  # Явно задаём кодировку
+      - POSTGRES_DB=event_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
     volumes:
-      - postgres_stats_data:/var/lib/postgresql/data
-      - ./stats/stats-server/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro  # Автоматическое создание схемы
+      - ./volumes/postgres/event_data:/var/lib/postgresql/data/
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U test -d stats"]
-      interval: 10s
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
       timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-    networks:
-      - ewm-network
-    labels:
-      - "com.practicum.service=database"
-      - "com.practicum.project=explore-with-me"
+      interval: 5s
+      retries: 10
 
-volumes:
-  postgres_ewm_data:
-    name: ewm-postgres-data
-    labels:
-      - "com.practicum.service=database"
-      - "com.practicum.project=explore-with-me"
-  postgres_stats_data:
-    name: stats-postgres-data
-    labels:
-      - "com.practicum.service=database"
-      - "com.practicum.project=explore-with-me"
+  request-db:
+    image: postgres:16.1-alpine
+    container_name: request-db
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_DB=request_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+    volumes:
+      - ./volumes/postgres/request_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
 
-networks:
-  ewm-network:
-    name: ewm-network
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
-    labels:
-      - "com.practicum.project=explore-with-me"
+  user-db:
+    image: postgres:16.1-alpine
+    container_name: user-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=user_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+    volumes:
+      - ./volumes/postgres/user_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
