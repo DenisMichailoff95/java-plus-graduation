@@ -1,5 +1,5 @@
 server:
-  port: 0
+  port: 8888  # Используем фиксированный порт вместо случайного
 
 spring:
   application:
@@ -20,5 +20,5 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     preferIpAddress: true
-    instance-id: ${spring.application.name}:${random.int[10000,99999]}
+    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${spring.application.instance_id:${server.port}}
     lease-renewal-interval-in-seconds: 10
