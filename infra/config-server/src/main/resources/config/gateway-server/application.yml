@@ -8,98 +8,112 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
+          enabled: false
           lower-case-service-id: true
-          predicates:
-            - name: Path
-              args:
-                pattern: "'/' + serviceId.toLowerCase() + '/**'"
-          filters:
-            - name: RewritePath
-              args:
-                regexp: "'/' + serviceId.toLowerCase() + '/(?<remaining>.*)'"
-                replacement: "'/${remaining}'"
-
-      # Дополнительные маршруты для Actuator
       routes:
-        - id: actuator_health
-          uri: http://localhost:${server.port}
+        # User Service Routes
+        - id: user_service_route
+          uri: lb://user-service
           predicates:
-            - Path=/health
+            - Path=/admin/users/**
           filters:
-            - SetPath=/actuator/health
+            - name: CircuitBreaker
+              args:
+                name: user-service
+                fallbackUri: forward:/fallback/user-service
 
-        - id: actuator_info
-          uri: http://localhost:${server.port}
+        # Event Service Routes
+        - id: event_service_public_route
+          uri: lb://event-service
           predicates:
-            - Path=/info
+            - Path=/events/**, /compilations/**, /categories/**
           filters:
-            - SetPath=/actuator/info
+            - name: CircuitBreaker
+              args:
+                name: event-service
+                fallbackUri: forward:/fallback/event-service
 
-        - id: actuator_gateway
-          uri: http://localhost:${server.port}
+        - id: event_service_private_route
+          uri: lb://event-service
           predicates:
-            - Path=/gateway/**
+            - Path=/users/{userId}/events/**
           filters:
-            - RewritePath=/gateway/(?<segment>.*), /actuator/gateway/$\{segment}
+            - name: CircuitBreaker
+              args:
+                name: event-service
+                fallbackUri: forward:/fallback/event-service
 
-      # Настройки HTTP клиента
-      httpclient:
-        connect-timeout: 1000
-        response-timeout: 5s
-        pool:
-          type: elastic
-          max-connections: 1000
-          max-idle-time: 60s
+        - id: event_service_admin_route
+          uri: lb://event-service
+          predicates:
+            - Path=/admin/events/**, /admin/categories/**, /admin/compilations/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: event-service
+                fallbackUri: forward:/fallback/event-service
 
-      # Настройки метрик
-      metrics:
-        enabled: true
+        # Request Service Routes
+        - id: request_service_user_route
+          uri: lb://request-service
+          predicates:
+            - Path=/users/{userId}/requests/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: request-service
+                fallbackUri: forward:/fallback/request-service
 
-      # Глобальные фильтры
-      default-filters:
-        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials
-        - name: RequestRateLimiter
-          args:
-            redis-rate-limiter.replenishRate: 10
-            redis-rate-limiter.burstCapacity: 20
-            key-resolver: "#{@remoteAddrKeyResolver}"
+        - id: request_service_event_route
+          uri: lb://request-service
+          predicates:
+            - Path=/users/{userId}/events/{eventId}/requests/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: request-service
+                fallbackUri: forward:/fallback/request-service
+
+        # Comment Service Routes
+        - id: comment_service_public_route
+          uri: lb://comment-service
+          predicates:
+            - Path=/events/{eventId}/comments/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: comment-service
+                fallbackUri: forward:/fallback/comment-service
+
+        - id: comment_service_private_route
+          uri: lb://comment-service
+          predicates:
+            - Path=/users/{userId}/comments/**, /users/{userId}/events/{eventId}/comments/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: comment-service
+                fallbackUri: forward:/fallback/comment-service
+
+        - id: comment_service_admin_route
+          uri: lb://comment-service
+          predicates:
+            - Path=/admin/comments/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: comment-service
+                fallbackUri: forward:/fallback/comment-service
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway,metrics,env,beans
-      base-path: /actuator
-      cors:
-        allowed-origins: "*"
-        allowed-methods: GET,POST,PUT,DELETE,OPTIONS
-        allowed-headers: "*"
-        allow-credentials: true
+        include: "*"
   endpoint:
-    health:
-      show-details: always
-      show-components: always
-      probes:
-        enabled: true
     gateway:
       enabled: true
-    metrics:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-    web:
-      server:
-        request:
-          autotime:
-            enabled: true
 
-# Настройки Resilience4j для Circuit Breaker (опционально)
 resilience4j:
   circuitbreaker:
     configs:
@@ -110,15 +124,6 @@ resilience4j:
         waitDurationInOpenState: 5s
         failureRateThreshold: 50
         eventConsumerBufferSize: 10
-    instances:
-      user-service:
-        baseConfig: default
-      event-service:
-        baseConfig: default
-      request-service:
-        baseConfig: default
-      comment-service:
-        baseConfig: default
   retry:
     configs:
       default:
@@ -129,58 +134,7 @@ resilience4j:
           - java.io.IOException
           - java.util.concurrent.TimeoutException
 
-# Настройки Rate Limiting (опционально)
-spring:
-  data:
-    redis:
-      host: localhost
-      port: 6379
-  cloud:
-    gateway:
-      filter:
-        rate-limiter:
-          redis-rate-limiter.replenish-rate: 10
-          redis-rate-limiter.burst-capacity: 20
-
-# Логирование
 logging:
   level:
-    # Основные логи
-    org.springframework.cloud.gateway: INFO
-    org.springframework.cloud.client.discovery: INFO
-    org.springframework.web: INFO
-
-    # Для отладки маршрутизации
-    reactor.netty.http.client: WARN
-    reactor.netty.http.server: WARN
-
-    # Логи локатора
-    org.springframework.cloud.gateway.discovery.DiscoveryClientRouteDefinitionLocator: DEBUG
-
-    # Логи Eureka
-    com.netflix.discovery: INFO
-    com.netflix.eureka: INFO
-
-    # Логи Circuit Breaker
-    io.github.resilience4j: INFO
-
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-
-  file:
-    name: logs/gateway-server.log
-    max-size: 10MB
-    max-history: 10
-
-# Информация о приложении
-info:
-  app:
-    name: Explore With Me Gateway
-    description: API Gateway для микросервисной платформы мероприятий
-    version: 0.0.1-SNAPSHOT
-    environment: ${spring.profiles.active:default}
-  build:
-    artifact: ${project.artifactId}
-    version: ${project.version}
-    time: ${build.time}
+    org.springframework.cloud.gateway: DEBUG
+    reactor.netty: DEBUG
