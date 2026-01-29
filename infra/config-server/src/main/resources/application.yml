@@ -1,5 +1,5 @@
 server:
-  port: 0  # Случайный порт согласно требованиям
+  port: 8888  # Используем фиксированный порт вместо случайного
 
 spring:
   application:
@@ -10,73 +10,15 @@ spring:
     config:
       server:
         native:
-          search-locations:
+          searchLocations:
             - classpath:config/{application}
-            - file:./config/{application}
-          fail-on-error: true
-        enabled: true
-        health:
-          enabled: true
+            - classpath:config/{application}/{profile}
 
-# Настройки Eureka - Config Server регистрируется как обычный сервис
 eureka:
   client:
-    enabled: true
-    register-with-eureka: true
-    fetch-registry: true
-    service-url:
+    serviceUrl:
       defaultZone: http://localhost:8761/eureka/
-    healthcheck:
-      enabled: true
-    registry-fetch-interval-seconds: 30
   instance:
-    prefer-ip-address: false
-    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
-    hostname: localhost
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 90
-    metadata-map:
-      startup: ${random.int}
-      configServer: true
-
-# Настройки Actuator
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,configprops,env,refresh
-      base-path: /actuator
-  endpoint:
-    health:
-      show-details: when-authorized
-      probes:
-        enabled: false
-    info:
-      enabled: true
-    configprops:
-      enabled: true
-    env:
-      enabled: true
-    refresh:
-      enabled: true
-
-# Настройки логирования
-logging:
-  level:
-    org.springframework.cloud.config: INFO
-    ru.practicum: INFO
-    com.netflix.eureka: WARN
-    com.netflix.discovery: WARN
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %-40.40logger{39} : %msg%n"
-  file:
-    name: logs/config-server.log
-    max-size: 10MB
-    max-history: 7
-
-# Включить обнаружение через Eureka для клиентов
-spring.cloud.config.discovery.enabled: true
-spring.cloud.config.discovery.service-id: config-server
-
-# Дополнительные настройки
-debug: false
+    preferIpAddress: true
+    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${spring.application.instance_id:${server.port}}
+    lease-renewal-interval-in-seconds: 10
