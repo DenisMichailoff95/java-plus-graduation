@@ -3,50 +3,9 @@ version: '3.8'
 networks:
   ewm-network:
     driver: bridge
-    name: ewm-network
 
 services:
-  # Discovery Server (Eureka) - ДОЛЖЕН БЫТЬ ПЕРВЫМ
-  discovery-server:
-    image: openjdk:21-jdk-slim
-    container_name: discovery-server
-    ports:
-      - "8761:8761"
-    volumes:
-      - ./infra/discovery-server/target/discovery-server-0.0.1-SNAPSHOT.jar:/app.jar
-    command: java -jar /app.jar
-    networks:
-      - ewm-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: unless-stopped
-
-  # Config Server - ДОЛЖЕН БЫТЬ ВТОРЫМ
-  config-server:
-    image: openjdk:21-jdk-slim
-    container_name: config-server
-    ports:
-      - "8888:8888"
-    depends_on:
-      discovery-server:
-        condition: service_healthy
-    volumes:
-      - ./infra/config-server/target/config-server-0.0.1-SNAPSHOT.jar:/app.jar
-      - ./infra/config-server/src/main/resources/config:/config
-    command: java -jar /app.jar
-    networks:
-      - ewm-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: unless-stopped
-
-  # Базы данных на Alpine
+  # Базы данных должны запускаться ПЕРВЫМИ
   user-db:
     image: postgres:16-alpine
     container_name: user-db
@@ -59,14 +18,14 @@ services:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
       - ./volumes/postgres/user_data:/var/lib/postgresql/data/
+      - ./core/user-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ewm-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ewm -d user_db"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
 
   event-db:
     image: postgres:16-alpine
@@ -80,14 +39,14 @@ services:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
       - ./volumes/postgres/event_data:/var/lib/postgresql/data/
+      - ./core/event-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ewm-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ewm -d event_db"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
 
   request-db:
     image: postgres:16-alpine
@@ -101,14 +60,14 @@ services:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
       - ./volumes/postgres/request_data:/var/lib/postgresql/data/
+      - ./core/request-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ewm-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ewm -d request_db"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
 
   comment-db:
     image: postgres:16-alpine
@@ -122,14 +81,14 @@ services:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
       - ./volumes/postgres/comment_data:/var/lib/postgresql/data/
+      - ./core/comment-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ewm-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ewm -d comment_db"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
 
   stats-db:
     image: postgres:16-alpine
@@ -147,10 +106,9 @@ services:
       - ewm-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U test -d stats"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
 
   analyzer-db:
     image: postgres:16-alpine
@@ -164,16 +122,16 @@ services:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
       - ./volumes/postgres/analyzer_data:/var/lib/postgresql/data/
+      - ./stats/analyzer/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ewm-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U adb -d analyzer-db"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
 
-  # ZooKeeper и Kafka
+  # ZooKeeper
   zookeeper:
     image: zookeeper:3.9
     container_name: zookeeper
@@ -186,6 +144,7 @@ services:
       - ewm-network
     restart: unless-stopped
 
+  # Kafka
   kafka:
     image: apache/kafka:3.8
     container_name: kafka
@@ -201,101 +160,6 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-    networks:
-      - ewm-network
-    restart: unless-stopped
-
-  # Gateway Server
-  gateway-server:
-    image: openjdk:21-jdk-slim
-    container_name: gateway-server
-    ports:
-      - "8080:8080"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      discovery-server:
-        condition: service_healthy
-    volumes:
-      - ./infra/gateway-server/target/gateway-server-0.0.1-SNAPSHOT.jar:/app.jar
-    command: java -jar /app.jar
-    networks:
-      - ewm-network
-    restart: unless-stopped
-
-  # Бизнес-сервисы
-  user-service:
-    image: openjdk:21-jdk-slim
-    container_name: user-service
-    ports:
-      - "8081:8081"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      discovery-server:
-        condition: service_healthy
-      user-db:
-        condition: service_healthy
-    volumes:
-      - ./core/user-service/target/user-service-0.0.1-SNAPSHOT.jar:/app.jar
-    command: java -jar /app.jar
-    networks:
-      - ewm-network
-    restart: unless-stopped
-
-  event-service:
-    image: openjdk:21-jdk-slim
-    container_name: event-service
-    ports:
-      - "8082:8082"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      discovery-server:
-        condition: service_healthy
-      event-db:
-        condition: service_healthy
-    volumes:
-      - ./core/event-service/target/event-service-0.0.1-SNAPSHOT.jar:/app.jar
-    command: java -jar /app.jar
-    networks:
-      - ewm-network
-    restart: unless-stopped
-
-  request-service:
-    image: openjdk:21-jdk-slim
-    container_name: request-service
-    ports:
-      - "8083:8083"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      discovery-server:
-        condition: service_healthy
-      request-db:
-        condition: service_healthy
-    volumes:
-      - ./core/request-service/target/request-service-0.0.1-SNAPSHOT.jar:/app.jar
-    command: java -jar /app.jar
-    networks:
-      - ewm-network
-    restart: unless-stopped
-
-  comment-service:
-    image: openjdk:21-jdk-slim
-    container_name: comment-service
-    ports:
-      - "8084:8084"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      discovery-server:
-        condition: service_healthy
-      comment-db:
-        condition: service_healthy
-    volumes:
-      - ./core/comment-service/target/comment-service-0.0.1-SNAPSHOT.jar:/app.jar
-    command: java -jar /app.jar
     networks:
       - ewm-network
     restart: unless-stopped
