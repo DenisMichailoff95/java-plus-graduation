@@ -3,95 +3,12 @@ version: '3.8'
 networks:
   ewm-network:
     driver: bridge
+    name: ewm-network
 
 services:
-  # Базы данных должны запускаться ПЕРВЫМИ
-  user-db:
-    image: postgres:16-alpine
-    container_name: user-db
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=user_db
-      - POSTGRES_USER=ewm
-      - POSTGRES_PASSWORD=ewm
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
-    volumes:
-      - ./volumes/postgres/user_data:/var/lib/postgresql/data/
-      - ./core/user-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - ewm-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d user_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  event-db:
-    image: postgres:16-alpine
-    container_name: event-db
-    ports:
-      - "5433:5432"
-    environment:
-      - POSTGRES_DB=event_db
-      - POSTGRES_USER=ewm
-      - POSTGRES_PASSWORD=ewm
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
-    volumes:
-      - ./volumes/postgres/event_data:/var/lib/postgresql/data/
-      - ./core/event-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - ewm-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d event_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  request-db:
-    image: postgres:16-alpine
-    container_name: request-db
-    ports:
-      - "5434:5432"
-    environment:
-      - POSTGRES_DB=request_db
-      - POSTGRES_USER=ewm
-      - POSTGRES_PASSWORD=ewm
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
-    volumes:
-      - ./volumes/postgres/request_data:/var/lib/postgresql/data/
-      - ./core/request-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - ewm-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d request_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  comment-db:
-    image: postgres:16-alpine
-    container_name: comment-db
-    ports:
-      - "5435:5432"
-    environment:
-      - POSTGRES_DB=comment_db
-      - POSTGRES_USER=ewm
-      - POSTGRES_PASSWORD=ewm
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
-    volumes:
-      - ./volumes/postgres/comment_data:/var/lib/postgresql/data/
-      - ./core/comment-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - ewm-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d comment_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
+  # Базы данных
   stats-db:
-    image: postgres:16-alpine
+    image: postgres:16.1
     container_name: stats-db
     ports:
       - "5436:5432"
@@ -99,19 +16,69 @@ services:
       - POSTGRES_DB=stats
       - POSTGRES_USER=test
       - POSTGRES_PASSWORD=test
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
       - ./volumes/postgres/stats_data:/var/lib/postgresql/data/
     networks:
       - ewm-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U test -d stats"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+
+  comment-db:
+    image: postgres:16.1
+    container_name: comment-db
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_DB=comment_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+    volumes:
+      - ./volumes/postgres/comment_data:/var/lib/postgresql/data/
+    networks:
+      - ewm-network
+
+  event-db:
+    image: postgres:16.1
+    container_name: event-db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=event_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+    volumes:
+      - ./volumes/postgres/event_data:/var/lib/postgresql/data/
+    networks:
+      - ewm-network
+
+  request-db:
+    image: postgres:16.1
+    container_name: request-db
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_DB=request_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+    volumes:
+      - ./volumes/postgres/request_data:/var/lib/postgresql/data/
+    networks:
+      - ewm-network
+
+  user-db:
+    image: postgres:16.1
+    container_name: user-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=user_db
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+    volumes:
+      - ./volumes/postgres/user_data:/var/lib/postgresql/data/
+    networks:
+      - ewm-network
 
   analyzer-db:
-    image: postgres:16-alpine
+    image: postgres:16.1
     container_name: analyzer-db
     ports:
       - "6538:5432"
@@ -119,34 +86,23 @@ services:
       - POSTGRES_DB=analyzer-db
       - POSTGRES_USER=adb
       - POSTGRES_PASSWORD=password
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
       - ./volumes/postgres/analyzer_data:/var/lib/postgresql/data/
-      - ./stats/analyzer/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ewm-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U adb -d analyzer-db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   # ZooKeeper
   zookeeper:
-    image: zookeeper:3.9
+    image: wurstmeister/zookeeper:latest
     container_name: zookeeper
     ports:
       - "2181:2181"
-    environment:
-      ZOO_MY_ID: 1
-      ZOO_SERVERS: server.1=zookeeper:2888:3888;2181
     networks:
       - ewm-network
-    restart: unless-stopped
 
   # Kafka
   kafka:
-    image: apache/kafka:3.8
+    image: wurstmeister/kafka:2.13-2.8.1
     container_name: kafka
     depends_on:
       - zookeeper
@@ -157,9 +113,5 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_CREATE_TOPICS: "stats.user-actions.v1:3:1,stats.events-similarity.v1:3:1"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     networks:
       - ewm-network
-    restart: unless-stopped
