@@ -16,7 +16,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <spring-cloud.version>2024.0.1</spring-cloud.version> <!-- Обновлено с 2024.0.0 на 2024.0.1 -->
+        <spring-cloud.version>2024.0.0</spring-cloud.version>
     </properties>
 
     <dependencyManagement>
@@ -35,7 +35,7 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
-            <scope>provided</scope>
+            <scope>provided</scope> <!-- provided, т.к. будет в микросервисах -->
         </dependency>
         <dependency>
             <groupId>io.github.resilience4j</groupId>
@@ -129,6 +129,7 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+
         </plugins>
     </build>
 </project>
