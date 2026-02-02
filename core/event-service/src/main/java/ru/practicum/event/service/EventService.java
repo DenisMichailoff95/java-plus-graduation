@@ -27,6 +27,11 @@ public interface EventService {
 
     List<EventShortDtoOut> findByInitiator(Long userId, Integer offset, Integer limit);
 
+    // Новые методы для рекомендаций
+    List<EventShortDtoOut> getRecommendationsForUser(Long userId, int maxResults);
+
+    void sendLikeAction(Long userId, Long eventId);
+
     // Методы для внутреннего использования
     EventDtoOut getEventById(Long eventId);
 
@@ -37,4 +42,6 @@ public interface EventService {
     List<EventShortDtoOut> getEventsByIds(List<Long> eventIds);
 
     List<EventDtoOut> getFullEventsByIds(List<Long> eventIds);
+
+    EventDtoOut findPublishedWithUser(Long eventId, Long userId);
 }

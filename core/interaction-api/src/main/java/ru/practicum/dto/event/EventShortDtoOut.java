@@ -33,5 +33,5 @@ public class EventShortDtoOut {
     private Integer confirmedRequests;
 
     @Builder.Default
-    private Long views = 0L;
+    private Double rating = 0.0;
 }

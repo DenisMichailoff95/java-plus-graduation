@@ -26,13 +26,14 @@ public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final EventRepository eventRepository;
+    private final CategoryMapper categoryMapper;
 
     @Override
     public List<CategoryDtoOut> getAll(Integer offset, Integer limit) {
         Pageable pageable = PageRequest.of(offset / limit, limit);
         Page<Category> categoriesPage = categoryRepository.findAllByOrderById(pageable);
         return categoriesPage.getContent().stream()
-                .map(CategoryMapper::toDto)
+                .map(categoryMapper::toDto)
                 .collect(Collectors.toList());
     }
 
@@ -40,7 +41,7 @@ public class CategoryServiceImpl implements CategoryService {
     public CategoryDtoOut get(Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Category", id));
-        return CategoryMapper.toDto(category);
+        return categoryMapper.toDto(category);
     }
 
     @Override
@@ -49,9 +50,9 @@ public class CategoryServiceImpl implements CategoryService {
         if (categoryRepository.existsByName(categoryDto.getName())) {
             throw new IllegalStateException("Category " + categoryDto.getName() + " already exists");
         }
-        Category category = CategoryMapper.fromDto(categoryDto);
+        Category category = categoryMapper.fromDto(categoryDto);
         Category saved = categoryRepository.save(category);
-        return CategoryMapper.toDto(saved);
+        return categoryMapper.toDto(saved);
     }
 
     @Override
@@ -67,7 +68,7 @@ public class CategoryServiceImpl implements CategoryService {
 
         category.setName(categoryDto.getName());
         Category saved = categoryRepository.save(category);
-        return CategoryMapper.toDto(saved);
+        return categoryMapper.toDto(saved);
     }
 
     @Override
@@ -98,7 +99,7 @@ public class CategoryServiceImpl implements CategoryService {
         List<Category> categories = categoryRepository.findAllById(ids);
 
         return categories.stream()
-                .map(CategoryMapper::toDto)
+                .map(categoryMapper::toDto)
                 .collect(Collectors.toList());
     }
 

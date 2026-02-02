@@ -36,6 +36,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentRepository commentRepository;
     private final UserClient userClient;
     private final EventClient eventClient;
+    private final CommentMapper commentMapper;
 
     @Override
     @Transactional
@@ -66,13 +67,12 @@ public class CommentServiceImpl implements CommentService {
         Comment saved = commentRepository.save(comment);
 
         UserDtoOut author = userClient.getUserById(userId);
-
         EventShortDtoOut eventShort = eventClient.getShortEventById(eventId);
 
         log.info("Создан комментарий ID: {} пользователем ID: {} к событию ID: {}",
                 saved.getId(), userId, eventId);
 
-        return CommentMapper.toDto(saved, eventShort, author);
+        return commentMapper.toDto(saved, eventShort, author);
     }
 
     @Override
@@ -101,7 +101,7 @@ public class CommentServiceImpl implements CommentService {
         EventShortDtoOut event = eventClient.getShortEventById(comment.getEventId());
         UserDtoOut author = userClient.getUserById(userId);
 
-        return CommentMapper.toDto(updated, event, author);
+        return commentMapper.toDto(updated, event, author);
     }
 
     @Override
@@ -144,7 +144,7 @@ public class CommentServiceImpl implements CommentService {
         EventShortDtoOut event = eventClient.getShortEventById(comment.getEventId());
         UserDtoOut author = userClient.getUserById(comment.getUserId());
 
-        return CommentMapper.toDto(comment, event, author);
+        return commentMapper.toDto(comment, event, author);
     }
 
     @Override
@@ -237,7 +237,7 @@ public class CommentServiceImpl implements CommentService {
                         return null;
                     }
 
-                    return CommentMapper.toDto(comment, event, author);
+                    return commentMapper.toDto(comment, event, author);
                 })
                 .filter(commentDto -> commentDto != null)
                 .collect(Collectors.toList());

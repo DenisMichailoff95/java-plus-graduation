@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 public class RequestClientController implements RequestClient {
 
     private final ParticipationRequestRepository requestRepository;
+    private final ParticipationRequestMapper requestMapper;
 
     @Override
     @GetMapping("/event/{eventId}/count")
@@ -36,7 +37,7 @@ public class RequestClientController implements RequestClient {
     @GetMapping("/event/{eventId}")
     public List<ParticipationRequestDto> getRequestsForEvent(@PathVariable Long eventId) {
         return requestRepository.findAllByEventId(eventId).stream()
-                .map(ParticipationRequestMapper::toDto)
+                .map(requestMapper::toDto)
                 .toList();
     }
 

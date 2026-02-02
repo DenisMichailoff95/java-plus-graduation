@@ -20,11 +20,14 @@ import ru.practicum.exception.NotFoundException;
 import ru.practicum.mapper.ParticipationRequestMapper;
 import ru.practicum.model.ParticipationRequest;
 import ru.practicum.repository.ParticipationRequestRepository;
+import ru.practicum.statsclient.client.CollectorClient;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static ru.practicum.enums.RequestStatus.*;
+import static ru.practicum.enums.RequestStatus.CANCELED;
+import static ru.practicum.enums.RequestStatus.CONFIRMED;
+
 
 @Slf4j
 @Service
@@ -35,6 +38,8 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     private final UserClient userClient;
     private final EventClient eventClient;
     private final ParticipationRequestRepository requestRepository;
+    private final ParticipationRequestMapper requestMapper;
+    private final CollectorClient collectorClient;
 
     @Override
     @Transactional
@@ -69,7 +74,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
         }
 
         RequestStatus status = (!Boolean.TRUE.equals(event.getRequestModeration()) || event.getParticipantLimit() == 0)
-                ? RequestStatus.CONFIRMED
+                ? CONFIRMED
                 : RequestStatus.PENDING;
 
         log.debug("Determined request status: {}", status);
@@ -85,7 +90,11 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
         ParticipationRequest saved = requestRepository.save(request);
         log.info("Request saved: id={}, created={}", saved.getId(), saved.getCreated());
 
-        ParticipationRequestDto dto = ParticipationRequestMapper.toDto(saved);
+        if (status == CONFIRMED) {
+            sendRegisterActionAsync(userId, eventId);
+        }
+
+        ParticipationRequestDto dto = requestMapper.toDto(saved);
 
         log.info("=== END createRequest: created requestId={} with status={} ===",
                 saved.getId(), saved.getStatus());
@@ -99,7 +108,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
             throw new NotFoundException("User", userId);
         }
         return requestRepository.findAllByRequesterId(userId).stream()
-                .map(ParticipationRequestMapper::toDto)
+                .map(requestMapper::toDto)
                 .toList();
     }
 
@@ -148,7 +157,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
 
         List<ParticipationRequest> allByEventId = requestRepository.findAllByEventId(eventId);
         return allByEventId.stream()
-                .map(ParticipationRequestMapper::toDto)
+                .map(requestMapper::toDto)
                 .toList();
     }
 
@@ -166,7 +175,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
 
         request.setStatus(CANCELED);
         ParticipationRequest saved = requestRepository.save(request);
-        return ParticipationRequestMapper.toDto(saved);
+        return requestMapper.toDto(saved);
     }
 
     private boolean userExists(Long userId) {
@@ -223,7 +232,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     private EventRequestStatusUpdateResult confirmRequests(EventDtoOut event, List<ParticipationRequest> requests) {
         checkIfLimitAvailableOrThrow(event);
         int limit = event.getParticipantLimit();
-        long confirmedCount = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
+        long confirmedCount = requestRepository.countByEventIdAndStatus(event.getId(), CONFIRMED);
         int available = limit - (int) confirmedCount;
 
         List<ParticipationRequest> confirmed = new ArrayList<>();
@@ -232,9 +241,11 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
         for (ParticipationRequest request : requests) {
             if (shouldAutoConfirm(event)) {
                 confirmRequest(request, confirmed);
+                sendRegisterActionAsync(request.getRequesterId(), request.getEventId());
             } else if (available > 0) {
                 confirmRequest(request, confirmed);
                 available--;
+                sendRegisterActionAsync(request.getRequesterId(), request.getEventId());
             } else {
                 rejectRequest(request, rejected);
             }
@@ -242,11 +253,11 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
 
         requestRepository.saveAll(requests);
         List<ParticipationRequestDto> confirmedDtos = confirmed.stream()
-                .map(ParticipationRequestMapper::toDto)
+                .map(requestMapper::toDto)
                 .toList();
 
         List<ParticipationRequestDto> rejectedDtos = rejected.stream()
-                .map(ParticipationRequestMapper::toDto)
+                .map(requestMapper::toDto)
                 .toList();
 
         return new EventRequestStatusUpdateResult(confirmedDtos, rejectedDtos);
@@ -254,7 +265,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
 
     private void checkIfLimitAvailableOrThrow(EventDtoOut event) {
         int limit = event.getParticipantLimit();
-        long confirmedCount = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
+        long confirmedCount = requestRepository.countByEventIdAndStatus(event.getId(), CONFIRMED);
         if (limit != 0 && Boolean.TRUE.equals(event.getRequestModeration()) && confirmedCount >= limit) {
             throw new ConditionNotMetException("Лимит участников мероприятия достигнет");
         }
@@ -265,7 +276,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     }
 
     private void confirmRequest(ParticipationRequest request, List<ParticipationRequest> confirmed) {
-        request.setStatus(RequestStatus.CONFIRMED);
+        request.setStatus(CONFIRMED);
         confirmed.add(request);
     }
 
@@ -282,7 +293,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
         requestRepository.saveAll(requests);
 
         List<ParticipationRequestDto> rejectedDtos = requests.stream()
-                .map(ParticipationRequestMapper::toDto)
+                .map(requestMapper::toDto)
                 .toList();
 
         return new EventRequestStatusUpdateResult(List.of(), rejectedDtos);
@@ -308,5 +319,17 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
         event.setParticipantLimit(10);
         event.setRequestModeration(true);
         return event;
+    }
+
+    private void sendRegisterActionAsync(Long userId, Long eventId) {
+        new Thread(() -> {
+            try {
+                collectorClient.sendRegisterAction(userId, eventId);
+                log.info("Sent REGISTER action for user {} event {}", userId, eventId);
+            } catch (Exception e) {
+                log.warn("Failed to send REGISTER action (async): user={}, event={}, error={}",
+                        userId, eventId, e.getMessage());
+            }
+        }).start();
     }
 }

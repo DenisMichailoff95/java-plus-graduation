@@ -18,4 +18,3 @@ public class CompilationDto {
     private Boolean pinned;
     private List<EventShortDtoOut> events;
 }
-
