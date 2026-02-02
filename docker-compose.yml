@@ -6,46 +6,67 @@ networks:
     name: ewm-network
 
 services:
-
-  stats-db:
-    image: postgres:16-alpine
-    container_name: stats-db
+  # Discovery Server (Eureka) - ДОЛЖЕН БЫТЬ ПЕРВЫМ
+  discovery-server:
+    image: openjdk:21-jdk-slim
+    container_name: discovery-server
     ports:
-      - "5436:5432"
-    environment:
-      - POSTGRES_DB=stats
-      - POSTGRES_USER=test
-      - POSTGRES_PASSWORD=test
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+      - "8761:8761"
     volumes:
-      - ./volumes/postgres/stats_data:/var/lib/postgresql/data/
+      - ./infra/discovery-server/target/discovery-server-0.0.1-SNAPSHOT.jar:/app.jar
+    command: java -jar /app.jar
     networks:
       - ewm-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U test -d stats"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
       retries: 5
+    restart: unless-stopped
 
-  comment-db:
-    image: postgres:16-alpine
-    container_name: comment-db
+  # Config Server - ДОЛЖЕН БЫТЬ ВТОРЫМ
+  config-server:
+    image: openjdk:21-jdk-slim
+    container_name: config-server
     ports:
-      - "5435:5432"
+      - "8888:8888"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    volumes:
+      - ./infra/config-server/target/config-server-0.0.1-SNAPSHOT.jar:/app.jar
+      - ./infra/config-server/src/main/resources/config:/config
+    command: java -jar /app.jar
+    networks:
+      - ewm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # Базы данных на Alpine
+  user-db:
+    image: postgres:16-alpine
+    container_name: user-db
+    ports:
+      - "5432:5432"
     environment:
-      - POSTGRES_DB=comment_db
+      - POSTGRES_DB=user_db
       - POSTGRES_USER=ewm
       - POSTGRES_PASSWORD=ewm
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
-      - ./volumes/postgres/comment_data:/var/lib/postgresql/data/
+      - ./volumes/postgres/user_data:/var/lib/postgresql/data/
     networks:
       - ewm-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d comment_db"]
+      test: ["CMD-SHELL", "pg_isready -U ewm -d user_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
   event-db:
     image: postgres:16-alpine
@@ -65,7 +86,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ewm -d event_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
   request-db:
     image: postgres:16-alpine
@@ -85,27 +107,50 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ewm -d request_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
-  user-db:
+  comment-db:
     image: postgres:16-alpine
-    container_name: user-db
+    container_name: comment-db
     ports:
-      - "5432:5432"
+      - "5435:5432"
     environment:
-      - POSTGRES_DB=user_db
+      - POSTGRES_DB=comment_db
       - POSTGRES_USER=ewm
       - POSTGRES_PASSWORD=ewm
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     volumes:
-      - ./volumes/postgres/user_data:/var/lib/postgresql/data/
+      - ./volumes/postgres/comment_data:/var/lib/postgresql/data/
     networks:
       - ewm-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ewm -d user_db"]
+      test: ["CMD-SHELL", "pg_isready -U ewm -d comment_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
+
+  stats-db:
+    image: postgres:16-alpine
+    container_name: stats-db
+    ports:
+      - "5436:5432"
+    environment:
+      - POSTGRES_DB=stats
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+    volumes:
+      - ./volumes/postgres/stats_data:/var/lib/postgresql/data/
+    networks:
+      - ewm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   analyzer-db:
     image: postgres:16-alpine
@@ -125,9 +170,10 @@ services:
       test: ["CMD-SHELL", "pg_isready -U adb -d analyzer-db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
-  # ZooKeeper (официальный образ)
+  # ZooKeeper и Kafka
   zookeeper:
     image: zookeeper:3.9
     container_name: zookeeper
@@ -140,7 +186,6 @@ services:
       - ewm-network
     restart: unless-stopped
 
-  # Kafka (официальный образ)
   kafka:
     image: apache/kafka:3.8
     container_name: kafka
@@ -160,15 +205,97 @@ services:
       - ewm-network
     restart: unless-stopped
 
-  # Optional: pgAdmin для управления базами
-  pgadmin:
-    image: dpage/pgadmin4:8
-    container_name: pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@ewm.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+  # Gateway Server
+  gateway-server:
+    image: openjdk:21-jdk-slim
+    container_name: gateway-server
     ports:
-      - "5050:80"
+      - "8080:8080"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    volumes:
+      - ./infra/gateway-server/target/gateway-server-0.0.1-SNAPSHOT.jar:/app.jar
+    command: java -jar /app.jar
+    networks:
+      - ewm-network
+    restart: unless-stopped
+
+  # Бизнес-сервисы
+  user-service:
+    image: openjdk:21-jdk-slim
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      user-db:
+        condition: service_healthy
+    volumes:
+      - ./core/user-service/target/user-service-0.0.1-SNAPSHOT.jar:/app.jar
+    command: java -jar /app.jar
+    networks:
+      - ewm-network
+    restart: unless-stopped
+
+  event-service:
+    image: openjdk:21-jdk-slim
+    container_name: event-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      event-db:
+        condition: service_healthy
+    volumes:
+      - ./core/event-service/target/event-service-0.0.1-SNAPSHOT.jar:/app.jar
+    command: java -jar /app.jar
+    networks:
+      - ewm-network
+    restart: unless-stopped
+
+  request-service:
+    image: openjdk:21-jdk-slim
+    container_name: request-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      request-db:
+        condition: service_healthy
+    volumes:
+      - ./core/request-service/target/request-service-0.0.1-SNAPSHOT.jar:/app.jar
+    command: java -jar /app.jar
+    networks:
+      - ewm-network
+    restart: unless-stopped
+
+  comment-service:
+    image: openjdk:21-jdk-slim
+    container_name: comment-service
+    ports:
+      - "8084:8084"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      comment-db:
+        condition: service_healthy
+    volumes:
+      - ./core/comment-service/target/comment-service-0.0.1-SNAPSHOT.jar:/app.jar
+    command: java -jar /app.jar
     networks:
       - ewm-network
     restart: unless-stopped
