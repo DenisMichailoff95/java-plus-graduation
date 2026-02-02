@@ -1,14 +1,27 @@
 package ru.practicum.event.model;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import ru.practicum.enums.EventState;
 
 import java.time.LocalDateTime;
 
-@Entity
 @Getter
 @Setter
+@Entity
 @Builder
 @ToString
 @AllArgsConstructor
@@ -71,7 +84,7 @@ public class Event {
     @Builder.Default
     private Integer confirmedRequests = 0;
 
-    @Transient
     @Builder.Default
-    private Long views = 0L;
+    @Column(name = "rating", nullable = false)
+    private Double rating = 0.0;
 }

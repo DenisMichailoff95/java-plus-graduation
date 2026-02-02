@@ -1,0 +1,53 @@
+grpc:
+  server:
+    port: 0
+
+spring:
+  # Настройки БД
+  datasource:
+    driverClassName: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:6538/analyzer-db
+    username: adb
+    password: password
+
+  # JPA настройки
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc.time_zone: UTC
+
+  # SQL инициализация
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+  main:
+    banner-mode: off
+    log-startup-info: false
+
+logging:
+  level:
+    ru.practicum: DEBUG
+    org.hibernate.SQL: DEBUG
+
+kafka:
+  # Spring Kafka настройки (для стандартной конфигурации)
+  bootstrap-servers: localhost:9092
+  consumer:
+    group-id: analyzer-group
+    auto-offset-reset: earliest
+    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+  properties:
+    spring.json.trusted.packages: "*"
+
+  # Настройки для KafkaSettingsConfig
+  settings:
+    url: "localhost:9092"
+    action: "stats.user-actions.v1"
+    similarity: "stats.events-similarity.v1"

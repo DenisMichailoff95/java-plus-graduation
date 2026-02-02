@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS events (
     participant_limit INT DEFAULT 0,
     request_moderation BOOLEAN DEFAULT TRUE,
     state VARCHAR(20) NOT NULL,
+    rating DOUBLE PRECISION DEFAULT 0.0 NOT NULL, -- ← ДОБАВЛЕНО ПО ТЗ
 
     CONSTRAINT chk_state CHECK (state IN ('PENDING', 'PUBLISHED', 'CANCELED'))
     -- ВАЖНО: НЕТ внешних ключей на category_id и initiator_id

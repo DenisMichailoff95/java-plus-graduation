@@ -1,39 +1,17 @@
 package ru.practicum.mapper;
 
-import lombok.experimental.UtilityClass;
-import lombok.extern.slf4j.Slf4j;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import ru.practicum.dto.participation.ParticipationRequestDto;
 import ru.practicum.model.ParticipationRequest;
 
-import java.time.LocalDateTime;
+@Mapper(componentModel = "spring")
+public interface ParticipationRequestMapper {
 
-@Slf4j
-@UtilityClass
-public class ParticipationRequestMapper {
-    public static ParticipationRequestDto toDto(ParticipationRequest request) {
-        if (request == null) {
-            log.error("Cannot map null ParticipationRequest to DTO");
-            return null;
-        }
-
-        LocalDateTime created = request.getCreated();
-
-        if (created == null) {
-            log.warn("Request id={} has null created field, using current time", request.getId());
-            created = LocalDateTime.now();
-        }
-
-        ParticipationRequestDto dto = ParticipationRequestDto.builder()
-                .id(request.getId())
-                .created(created)
-                .event(request.getEventId())
-                .requester(request.getRequesterId())
-                .status(request.getStatus() != null ? request.getStatus().name() : "UNKNOWN")
-                .build();
-
-        log.debug("Mapped request id={} to DTO: created={}, event={}, requester={}",
-                request.getId(), dto.getCreated(), dto.getEvent(), dto.getRequester());
-
-        return dto;
-    }
+    @Mapping(source = "created", target = "created")
+    @Mapping(source = "eventId", target = "event")
+    @Mapping(source = "requesterId", target = "requester")
+    @Mapping(expression = "java(request.getStatus() != null ? request.getStatus().name() : \"UNKNOWN\")",
+            target = "status")
+    ParticipationRequestDto toDto(ParticipationRequest request);
 }

@@ -1,5 +1,6 @@
 package ru.practicum.event.service;
 
+import com.google.protobuf.Timestamp;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -20,9 +21,12 @@ import ru.practicum.dto.event.EventShortDtoOut;
 import ru.practicum.dto.event.EventUpdateAdminDto;
 import ru.practicum.dto.event.EventUpdateDto;
 import ru.practicum.dto.user.UserDtoOut;
-import ru.practicum.statsclient.EventStatsClient;
-
 import ru.practicum.enums.EventState;
+import ru.practicum.ewm.stats.proto.ActionTypeProto;
+import ru.practicum.ewm.stats.proto.InteractionsCountRequestProto;
+import ru.practicum.ewm.stats.proto.RecommendedEventProto;
+import ru.practicum.ewm.stats.proto.UserActionProto;
+import ru.practicum.ewm.stats.proto.UserPredictionsRequestProto;
 import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.model.Event;
 import ru.practicum.event.model.EventAdminFilter;
@@ -32,8 +36,15 @@ import ru.practicum.exception.ConditionNotMetException;
 import ru.practicum.exception.NoAccessException;
 import ru.practicum.exception.NotFoundException;
 
+import ru.practicum.statsclient.client.AnalyzerClient;
+import ru.practicum.statsclient.client.CollectorClient;
+
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -51,7 +62,9 @@ public class EventServiceImpl implements EventService {
     private final UserClient userClient;
     private final RequestClient requestClient;
     private final CommentClient commentClient;
-    private final EventStatsClient eventStatsClient;
+    private final EventMapper eventMapper;
+    private final CollectorClient collectorClient;
+    private final AnalyzerClient analyzerClient;
 
     @Override
     @Transactional
@@ -67,7 +80,7 @@ public class EventServiceImpl implements EventService {
             throw new NotFoundException("Category", eventDto.getCategoryId());
         }
 
-        Event event = EventMapper.fromDto(eventDto);
+        Event event = eventMapper.fromDto(eventDto);
         event.setInitiatorId(userId);
         event.setCategoryId(eventDto.getCategoryId());
 
@@ -181,8 +194,8 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findPublishedById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event", eventId));
 
-        Map<Long, Long> viewsMap = eventStatsClient.getViewsForEvents(List.of(eventId));
-        event.setViews(viewsMap.getOrDefault(eventId, 0L));
+        Double rating = getEventRatingFromAnalyzer(eventId);
+        event.setRating(rating != null ? rating : 0.0);
 
         return enrichEventWithExternalData(event);
     }
@@ -199,6 +212,10 @@ public class EventServiceImpl implements EventService {
         if (!event.getInitiatorId().equals(userId)) {
             throw new NoAccessException("Только инициатор может просматривать это событие");
         }
+
+        Double rating = getEventRatingFromAnalyzer(eventId);
+        event.setRating(rating != null ? rating : 0.0);
+
         return enrichEventWithExternalData(event);
     }
 
@@ -207,48 +224,9 @@ public class EventServiceImpl implements EventService {
         Specification<Event> spec = buildSpecification(filter);
         List<Event> events = eventRepository.findAll(spec, filter.getPageable()).getContent();
 
-        enrichEventsWithViews(events);
+        enrichEventsWithRatings(events);
 
-        List<EventShortDtoOut> result = enrichShortEventsWithExternalData(events);
-
-        // Фильтрация "только доступные" на уровне сервиса
-        if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
-            result = result.stream()
-                    .filter(event -> {
-                        // Получаем participantLimit из оригинального события
-                        Integer participantLimit = getParticipantLimitForEvent(event.getId());
-                        Integer confirmedRequests = event.getConfirmedRequests();
-
-                        // Если лимит не задан (0) или null, событие доступно
-                        if (participantLimit == null || participantLimit == 0) {
-                            return true;
-                        }
-
-                        // Проверяем, есть ли свободные места
-                        return confirmedRequests < participantLimit;
-                    })
-                    .collect(Collectors.toList());
-        }
-
-        // Применяем пагинацию после фильтрации
-        return applyPagination(result, filter.getFrom(), filter.getSize());
-    }
-
-    private Integer getParticipantLimitForEvent(Long eventId) {
-        return eventRepository.findParticipantLimitById(eventId);
-    }
-
-    private List<EventShortDtoOut> applyPagination(List<EventShortDtoOut> events, int from, int size) {
-        if (events.isEmpty()) {
-            return events;
-        }
-
-        int toIndex = Math.min(from + size, events.size());
-        if (from >= events.size()) {
-            return List.of();
-        }
-
-        return events.subList(from, toIndex);
+        return enrichShortEventsWithExternalData(events);
     }
 
     @Override
@@ -256,7 +234,7 @@ public class EventServiceImpl implements EventService {
         Specification<Event> spec = buildSpecification(filter);
         List<Event> events = eventRepository.findAll(spec, filter.getPageable()).getContent();
 
-        enrichEventsWithViews(events);
+        enrichEventsWithRatings(events);
 
         return enrichEventsWithExternalData(events);
     }
@@ -271,12 +249,80 @@ public class EventServiceImpl implements EventService {
         Pageable pageable = PageRequest.of(offset / limit, limit, Sort.by("id"));
         Page<Event> eventPage = eventRepository.findByInitiatorId(userId, pageable);
         List<Event> events = eventPage.getContent();
+
+        enrichEventsWithRatings(events);
+
         return enrichShortEventsWithExternalData(events);
+    }
+
+    @Override
+    public List<EventShortDtoOut> getRecommendationsForUser(Long userId, int maxResults) {
+        try {
+            UserPredictionsRequestProto request = UserPredictionsRequestProto.newBuilder()
+                    .setUserId(userId)
+                    .setMaxResult(maxResults)
+                    .build();
+
+            List<RecommendedEventProto> recommendations = analyzerClient.getRecommendationsForUser(request);
+
+            List<Long> recommendedEventIds = recommendations.stream()
+                    .map(RecommendedEventProto::getEventId)
+                    .toList();
+
+            if (recommendedEventIds.isEmpty()) {
+                return List.of();
+            }
+
+            List<Event> events = eventRepository.findByIdIn(recommendedEventIds);
+
+            Map<Long, Double> ratingMap = recommendations.stream()
+                    .collect(Collectors.toMap(
+                            RecommendedEventProto::getEventId,
+                            RecommendedEventProto::getScore
+                    ));
+
+            events.forEach(event -> {
+                Double rating = ratingMap.get(event.getId());
+                event.setRating(rating != null ? rating : 0.0);
+            });
+
+            return enrichShortEventsWithExternalData(events);
+
+        } catch (Exception e) {
+            log.error("Ошибка при получении рекомендаций для пользователя {}: {}", userId, e.getMessage());
+            return List.of();
+        }
+    }
+
+    @Override
+    public void sendLikeAction(Long userId, Long eventId) {
+        try {
+            Instant now = Instant.now();
+            UserActionProto action = UserActionProto.newBuilder()
+                    .setUserId(userId)
+                    .setEventId(eventId)
+                    .setActionType(ActionTypeProto.ACTION_LIKE)
+                    .setTimestamp(Timestamp.newBuilder()
+                            .setSeconds(now.getEpochSecond())
+                            .setNanos(now.getNano())
+                            .build())
+                    .build();
+
+            collectorClient.sendUserAction(action);
+            log.info("Отправлен лайк от пользователя {} для события {}", userId, eventId);
+
+        } catch (Exception e) {
+            log.warn("Ошибка при отправке лайка (не критично): {}", e.getMessage());
+        }
     }
 
     @Override
     public EventDtoOut getEventById(Long eventId) {
         Event event = getEvent(eventId);
+
+        Double rating = getEventRatingFromAnalyzer(eventId);
+        event.setRating(rating != null ? rating : 0.0);
+
         return enrichEventWithExternalData(event);
     }
 
@@ -284,14 +330,14 @@ public class EventServiceImpl implements EventService {
     public EventShortDtoOut getShortEventById(Long eventId) {
         Event event = getEvent(eventId);
 
-        Map<Long, Long> viewsMap = eventStatsClient.getViewsForEvents(List.of(eventId));
-        event.setViews(viewsMap.getOrDefault(eventId, 0L));
+        Double rating = getEventRatingFromAnalyzer(eventId);
+        event.setRating(rating != null ? rating : 0.0);
 
-        EventShortDtoOut dto = EventMapper.toShortDto(event);
+        EventShortDtoOut dto = eventMapper.toShortDto(event);
         dto.setCategory(categoryService.getCategoryById(event.getCategoryId()));
         dto.setInitiator(userClient.getUserById(event.getInitiatorId()));
         dto.setConfirmedRequests(requestClient.getConfirmedRequestsCount(eventId));
-        dto.setViews(event.getViews());
+        dto.setRating(event.getRating());
 
         return dto;
     }
@@ -304,12 +350,18 @@ public class EventServiceImpl implements EventService {
     @Override
     public List<EventShortDtoOut> getEventsByIds(List<Long> eventIds) {
         List<Event> events = eventRepository.findByIdIn(eventIds);
+
+        enrichEventsWithRatings(events);
+
         return enrichShortEventsWithExternalData(events);
     }
 
     @Override
     public List<EventDtoOut> getFullEventsByIds(List<Long> eventIds) {
         List<Event> events = eventRepository.findByIdIn(eventIds);
+
+        enrichEventsWithRatings(events);
+
         return enrichEventsWithExternalData(events);
     }
 
@@ -398,7 +450,7 @@ public class EventServiceImpl implements EventService {
                         optionalSpec(EventSpecifications.withCategoriesIn(filter.getCategories())),
                         optionalSpec(EventSpecifications.withPaid(filter.getPaid())),
                         optionalSpec(EventSpecifications.withState(filter.getState())),
-                        // Убрали вызов withOnlyAvailable из спецификаций, т.к. фильтрация теперь на уровне сервиса
+                        optionalSpec(EventSpecifications.withOnlyAvailable(filter.getOnlyAvailable())),
                         optionalSpec(EventSpecifications.withRangeStart(filter.getRangeStart())),
                         optionalSpec(EventSpecifications.withRangeEnd(filter.getRangeEnd()))
                 )
@@ -440,17 +492,17 @@ public class EventServiceImpl implements EventService {
 
         return events.stream()
                 .map(event -> {
-                    EventShortDtoOut dto = EventMapper.toShortDto(event);
+                    EventShortDtoOut dto = eventMapper.toShortDto(event);
                     dto.setCategory(categoriesMap.get(event.getCategoryId()));
                     dto.setInitiator(usersMap.get(event.getInitiatorId()));
                     dto.setConfirmedRequests(confirmedRequestsMap.getOrDefault(event.getId(), 0));
-                    dto.setViews(event.getViews());
+                    dto.setRating(event.getRating());
                     return dto;
                 })
                 .toList();
     }
 
-    private void enrichEventsWithViews(List<Event> events) {
+    private void enrichEventsWithRatings(List<Event> events) {
         if (events.isEmpty()) {
             return;
         }
@@ -459,22 +511,19 @@ public class EventServiceImpl implements EventService {
                 .map(Event::getId)
                 .collect(Collectors.toList());
 
-        Map<Long, Long> eventViewsMap = eventStatsClient.getViewsForEvents(eventIds);
+        Map<Long, Double> eventRatingsMap = getRatingsForEvents(eventIds);
 
         events.forEach(event ->
-                event.setViews(eventViewsMap.getOrDefault(event.getId(), 0L))
+                event.setRating(eventRatingsMap.getOrDefault(event.getId(), 0.0))
         );
     }
 
     private EventDtoOut enrichEventWithExternalData(Event event) {
-        Map<Long, Long> viewsMap = eventStatsClient.getViewsForEvents(List.of(event.getId()));
-        event.setViews(viewsMap.getOrDefault(event.getId(), 0L));
-
-        EventDtoOut dto = EventMapper.toDto(event);
+        EventDtoOut dto = eventMapper.toDto(event);
         dto.setCategory(categoryService.getCategoryById(event.getCategoryId()));
         dto.setInitiator(userClient.getUserById(event.getInitiatorId()));
         dto.setConfirmedRequests(getSafeConfirmedRequestsCount(event.getId()));
-        dto.setViews(event.getViews());
+        dto.setRating(event.getRating());
 
         return dto;
     }
@@ -508,23 +557,65 @@ public class EventServiceImpl implements EventService {
 
         return events.stream()
                 .map(event -> {
-                    EventDtoOut dto = EventMapper.toDto(event);
+                    EventDtoOut dto = eventMapper.toDto(event);
                     dto.setCategory(categoriesMap.get(event.getCategoryId()));
                     dto.setInitiator(usersMap.get(event.getInitiatorId()));
                     dto.setConfirmedRequests(confirmedRequestsMap.getOrDefault(event.getId(), 0));
-                    dto.setViews(event.getViews());
+                    dto.setRating(event.getRating());
                     return dto;
                 })
                 .toList();
     }
 
-    // Безопасные методы для возврата default значений
+    private Double getEventRatingFromAnalyzer(Long eventId) {
+        try {
+            InteractionsCountRequestProto request = InteractionsCountRequestProto.newBuilder()
+                    .addEventId(eventId)
+                    .build();
+
+            List<RecommendedEventProto> interactions = analyzerClient.getInteractionsCount(request);
+
+            if (!interactions.isEmpty()) {
+                return interactions.get(0).getScore();
+            }
+            return 0.0;
+
+        } catch (Exception e) {
+            log.warn("Не удалось получить рейтинг для события {}: {}", eventId, e.getMessage());
+            return 0.0;
+        }
+    }
+
+    private Map<Long, Double> getRatingsForEvents(List<Long> eventIds) {
+        if (eventIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        try {
+            InteractionsCountRequestProto.Builder builder = InteractionsCountRequestProto.newBuilder();
+            eventIds.forEach(builder::addEventId);
+
+            List<RecommendedEventProto> interactions = analyzerClient.getInteractionsCount(builder.build());
+
+            return interactions.stream()
+                    .collect(Collectors.toMap(
+                            RecommendedEventProto::getEventId,
+                            RecommendedEventProto::getScore
+                    ));
+
+        } catch (Exception e) {
+            log.warn("Не удалось получить рейтинги для событий: {}", e.getMessage());
+            return eventIds.stream()
+                    .collect(Collectors.toMap(id -> id, id -> 0.0));
+        }
+    }
+
     private Integer getSafeConfirmedRequestsCount(Long eventId) {
         try {
             return requestClient.getConfirmedRequestsCount(eventId);
         } catch (Exception e) {
             log.warn("Request service unavailable for event {}, returning 0: {}", eventId, e.getMessage());
-            return 0; //  возвращаем 0 при недоступности
+            return 0; // возвращаем 0 при недоступности
         }
     }
 
@@ -546,5 +637,16 @@ public class EventServiceImpl implements EventService {
             log.warn("Comment service unavailable for event {}, returning 0: {}", eventId, e.getMessage());
             return 0L; // возвращаем 0 комментариев
         }
+    }
+
+    @Override
+    public EventDtoOut findPublishedWithUser(Long eventId, Long userId) {
+        Event event = eventRepository.findPublishedById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event", eventId));
+
+        Double rating = getEventRatingFromAnalyzer(eventId);
+        event.setRating(rating != null ? rating : 0.0);
+
+        return enrichEventWithExternalData(event);
     }
 }

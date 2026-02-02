@@ -1,55 +1,49 @@
 package ru.practicum.event.mapper;
 
-import lombok.experimental.UtilityClass;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import ru.practicum.dto.event.EventCreateDto;
 import ru.practicum.dto.event.EventDtoOut;
 import ru.practicum.dto.event.EventShortDtoOut;
 import ru.practicum.dto.event.LocationDto;
 import ru.practicum.event.model.Event;
 
-@UtilityClass
-public class EventMapper {
-    public static Event fromDto(EventCreateDto eventDto) {
-        return Event.builder()
-                .annotation(eventDto.getAnnotation())
-                .title(eventDto.getTitle())
-                .paid(eventDto.getPaid())
-                .eventDate(eventDto.getEventDate())
-                .description(eventDto.getDescription())
-                .locationLat(eventDto.getLocation().getLat())
-                .locationLon(eventDto.getLocation().getLon())
-                .participantLimit(eventDto.getParticipantLimit())
-                .requestModeration(eventDto.getRequestModeration())
-                .build();
-    }
+@Mapper(componentModel = "spring")
+public interface EventMapper {
 
-    public static EventDtoOut toDto(Event event) {
-        return EventDtoOut.builder()
-                .id(event.getId())
-                .annotation(event.getAnnotation())
-                .title(event.getTitle())
-                .paid(event.getPaid())
-                .eventDate(event.getEventDate())
-                .description(event.getDescription())
-                .createdOn(event.getCreatedAt())
-                .state(event.getState().name())
-                .confirmedRequests(event.getConfirmedRequests())
-                .views(event.getViews())
-                .location(new LocationDto(event.getLocationLat(), event.getLocationLon()))
-                .participantLimit(event.getParticipantLimit())
-                .requestModeration(event.getRequestModeration())
-                .build();
-    }
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "categoryId", ignore = true)
+    @Mapping(target = "initiatorId", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "publishedOn", ignore = true)
+    @Mapping(target = "state", ignore = true)
+    @Mapping(target = "confirmedRequests", ignore = true)
+    @Mapping(target = "rating", ignore = true)
+    @Mapping(source = "location.lat", target = "locationLat")
+    @Mapping(source = "location.lon", target = "locationLon")
+    @Mapping(target = "paid", defaultValue = "false")
+    @Mapping(target = "participantLimit", defaultValue = "0")
+    @Mapping(target = "requestModeration", defaultValue = "true")
+    Event fromDto(EventCreateDto eventDto);
 
-    public static EventShortDtoOut toShortDto(Event event) {
-        return EventShortDtoOut.builder()
-                .id(event.getId())
-                .annotation(event.getAnnotation())
-                .title(event.getTitle())
-                .paid(event.getPaid())
-                .eventDate(event.getEventDate())
-                .confirmedRequests(event.getConfirmedRequests())
-                .views(event.getViews())
-                .build();
+    @Mapping(target = "category", ignore = true)
+    @Mapping(target = "initiator", ignore = true)
+    @Mapping(target = "location", expression = "java(mapToLocationDto(event))")
+    @Mapping(target = "state", expression = "java(event.getState() != null ? event.getState().name() : null)")
+    @Mapping(target = "confirmedRequests", ignore = true)
+    @Mapping(target = "rating", source = "rating")
+    EventDtoOut toDto(Event event);
+
+    @Mapping(target = "category", ignore = true)
+    @Mapping(target = "initiator", ignore = true)
+    @Mapping(target = "confirmedRequests", ignore = true)
+    @Mapping(target = "rating", source = "rating")
+    EventShortDtoOut toShortDto(Event event);
+
+    default LocationDto mapToLocationDto(Event event) {
+        if (event.getLocationLat() == null || event.getLocationLon() == null) {
+            return null;
+        }
+        return new LocationDto(event.getLocationLat(), event.getLocationLon());
     }
 }

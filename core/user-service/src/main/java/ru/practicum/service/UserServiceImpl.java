@@ -21,12 +21,13 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
     @Override
     @Transactional
     public UserDtoOut createUser(NewUserRequest request) {
-        User user = UserMapper.toEntity(request);
-        return UserMapper.toDto(userRepository.save(user));
+        User user = userMapper.toEntity(request);
+        return userMapper.toDto(userRepository.save(user));
     }
 
     @Override
@@ -38,7 +39,9 @@ public class UserServiceImpl implements UserService {
         } else {
             users = userRepository.findUsers(ids, pageable);
         }
-        return users.stream().map(UserMapper::toDto).collect(Collectors.toList());
+        return users.stream()
+                .map(userMapper::toDto)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -54,7 +57,7 @@ public class UserServiceImpl implements UserService {
     public UserDtoOut getUserById(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User", userId));
-        return UserMapper.toDto(user);
+        return userMapper.toDto(user);
     }
 
     @Override
@@ -73,7 +76,7 @@ public class UserServiceImpl implements UserService {
     public List<UserDtoOut> getUsersByIds(List<Long> ids) {
         List<User> users = userRepository.findByIdIn(ids);
         return users.stream()
-                .map(UserMapper::toDto)
+                .map(userMapper::toDto)
                 .collect(Collectors.toList());
     }
 }
