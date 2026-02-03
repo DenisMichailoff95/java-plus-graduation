@@ -37,19 +37,20 @@ public class UserActionDomainService {
         Double newWeight = convertActionToWeight(avro.getActionType());
         log.info("User action weight: {}", newWeight);
 
-        Map<Long, Double> userRatingsMap = usersFeedbackMap.computeIfAbsent(userId, k -> new HashMap<>());
-        Double oldWeight = userRatingsMap.getOrDefault(eventId, 0.0);
+        Map<Long, Double> userRatingsMap = usersFeedbackMap.computeIfAbsent(eventId, k -> new HashMap<>());
+        Double oldWeight = userRatingsMap.getOrDefault(userId, 0.0);
 
         log.info("Comparison of old and new weight: {} and {}", oldWeight, newWeight);
         if (oldWeight < newWeight) {
             log.info("The new weight is greater than the old one");
-            userRatingsMap.put(eventId, newWeight);
+            userRatingsMap.put(userId, newWeight);
             return determineSimilarity(eventId, userId, oldWeight, newWeight, avro.getTimestamp());
         } else {
             return Collections.emptyList();
         }
     }
-    
+
+
     private List<EventSimilarityAvro> determineSimilarity(Long eventId, Long userId, Double oldWeight, Double newWeight, Instant timestamp) {
 
         double updatedEventSum = eventWeightSumMap.getOrDefault(eventId, 0.0) - oldWeight + newWeight;
@@ -59,19 +60,13 @@ public class UserActionDomainService {
         List<EventSimilarityAvro> similarityMessages = new ArrayList<>();
 
         for (Map.Entry<Long, Map<Long, Double>> entry : usersFeedbackMap.entrySet()) {
-            Long currentUserId = entry.getKey();
+            Long currentEventId = entry.getKey();
             Map<Long, Double> userFeedbackMap = entry.getValue();
 
-            if (!userFeedbackMap.containsKey(eventId) || Objects.equals(currentUserId, userId)) continue;
+            if (!userFeedbackMap.containsKey(userId) || Objects.equals(currentEventId, eventId)) continue;
 
-            double userConvergenceWeight = userFeedbackMap.get(eventId);
-            RelationEvent eventPair = RelationEvent.create(eventId, userFeedbackMap.entrySet().stream()
-                    .filter(e -> !e.getKey().equals(eventId))
-                    .findFirst()
-                    .map(Map.Entry::getKey)
-                    .orElse(0L));
-
-            if (eventPair.first() == 0L || eventPair.second() == 0L) continue;
+            double userConvergenceWeight = userFeedbackMap.get(userId);
+            RelationEvent eventPair = RelationEvent.create(eventId, currentEventId);
 
             double previousMinSum = eventsMinWeightSumMap.getOrDefault(eventPair, 0.0);
             double updatedMinSum = previousMinSum - Math.min(oldWeight, userConvergenceWeight) + Math.min(newWeight, userConvergenceWeight);

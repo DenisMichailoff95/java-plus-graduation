@@ -224,25 +224,8 @@ public class EventServiceImpl implements EventService {
         Specification<Event> spec = buildSpecification(filter);
         List<Event> events = eventRepository.findAll(spec, filter.getPageable()).getContent();
 
-        // Применяем фильтр onlyAvailable на уровне сервиса
-        if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
-            List<Long> eventIds = events.stream()
-                    .map(Event::getId)
-                    .toList();
-
-            Map<Long, Integer> confirmedRequestsMap = getSafeConfirmedRequestsCounts(eventIds);
-
-            events = events.stream()
-                    .filter(event -> {
-                        int participantLimit = event.getParticipantLimit();
-                        if (participantLimit == 0) {
-                            return true; // нет ограничения
-                        }
-                        int confirmed = confirmedRequestsMap.getOrDefault(event.getId(), 0);
-                        return confirmed < participantLimit;
-                    })
-                    .toList();
-        }
+        // Применяем фильтрацию по доступности на уровне сервиса
+        events = filterEventsByAvailability(events, filter.getOnlyAvailable());
 
         enrichEventsWithRatings(events);
 
@@ -254,6 +237,7 @@ public class EventServiceImpl implements EventService {
         Specification<Event> spec = buildSpecification(filter);
         List<Event> events = eventRepository.findAll(spec, filter.getPageable()).getContent();
 
+        // Для административных запросов фильтр onlyAvailable не применяется
         enrichEventsWithRatings(events);
 
         return enrichEventsWithExternalData(events);
@@ -481,6 +465,34 @@ public class EventServiceImpl implements EventService {
 
     private static <T> Specification<T> optionalSpec(Specification<T> spec) {
         return spec;
+    }
+
+    private List<Event> filterEventsByAvailability(List<Event> events, Boolean onlyAvailable) {
+        if (onlyAvailable == null || !onlyAvailable) {
+            return events;
+        }
+
+        if (events.isEmpty()) {
+            return events;
+        }
+
+        List<Long> eventIds = events.stream()
+                .map(Event::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, Integer> confirmedRequestsMap = getSafeConfirmedRequestsCounts(eventIds);
+
+        return events.stream()
+                .filter(event -> {
+                    Integer participantLimit = event.getParticipantLimit();
+                    if (participantLimit == null || participantLimit == 0) {
+                        return true; // Событие без лимита всегда доступно
+                    }
+
+                    Integer confirmedRequests = confirmedRequestsMap.getOrDefault(event.getId(), 0);
+                    return confirmedRequests < participantLimit;
+                })
+                .collect(Collectors.toList());
     }
 
     private List<EventShortDtoOut> enrichShortEventsWithExternalData(List<Event> events) {
