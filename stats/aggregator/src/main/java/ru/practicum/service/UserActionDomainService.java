@@ -49,8 +49,7 @@ public class UserActionDomainService {
             return Collections.emptyList();
         }
     }
-
-
+    
     private List<EventSimilarityAvro> determineSimilarity(Long eventId, Long userId, Double oldWeight, Double newWeight, Instant timestamp) {
 
         double updatedEventSum = eventWeightSumMap.getOrDefault(eventId, 0.0) - oldWeight + newWeight;
