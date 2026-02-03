@@ -222,65 +222,11 @@ public class EventServiceImpl implements EventService {
     @Override
     public List<EventShortDtoOut> findShortEventsBy(EventFilter filter) {
         Specification<Event> spec = buildSpecification(filter);
+        List<Event> events = eventRepository.findAll(spec, filter.getPageable()).getContent();
 
-        try {
-            // Получаем ВСЕ события без пагинации сначала
-            List<Event> allEvents = eventRepository.findAll(spec);
+        enrichEventsWithRatings(events);
 
-            if (allEvents.isEmpty()) {
-                return List.of();
-            }
-
-            enrichEventsWithRatings(allEvents);
-
-            // Получаем participantLimit для всех событий
-            Map<Long, Integer> participantLimitMap = allEvents.stream()
-                    .collect(Collectors.toMap(
-                            Event::getId,
-                            Event::getParticipantLimit
-                    ));
-
-            // Обогащаем данные
-            List<EventShortDtoOut> result = enrichShortEventsWithExternalData(allEvents);
-
-            // Применяем фильтрацию "только доступные" если нужно
-            if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
-                result = result.stream()
-                        .filter(event -> {
-                            Integer participantLimit = participantLimitMap.get(event.getId());
-                            Integer confirmedRequests = event.getConfirmedRequests();
-
-                            // Если лимит не задан (0) или null, событие доступно
-                            if (participantLimit == null || participantLimit == 0) {
-                                return true;
-                            }
-
-                            // Проверяем, есть ли свободные места
-                            return confirmedRequests < participantLimit;
-                        })
-                        .collect(Collectors.toList());
-            }
-
-            // Применяем сортировку
-            if ("EVENT_DATE".equals(filter.getSort())) {
-                result.sort((e1, e2) -> e2.getEventDate().compareTo(e1.getEventDate()));
-            }
-            // Можно добавить другие виды сортировки при необходимости
-
-            // Применяем пагинацию ПОСЛЕ фильтрации
-            int from = filter.getFrom() != null ? filter.getFrom() : 0;
-            int size = filter.getSize() != null ? filter.getSize() : 10;
-            int toIndex = Math.min(from + size, result.size());
-
-            if (from >= result.size()) {
-                return List.of();
-            }
-
-            return result.subList(from, toIndex);
-        } catch (Exception e) {
-            log.error("Error in findShortEventsBy: {}", e.getMessage(), e);
-            throw e; // Пробрасываем исключение дальше для корректной обработки
-        }
+        return enrichShortEventsWithExternalData(events);
     }
 
     @Override
@@ -542,7 +488,7 @@ public class EventServiceImpl implements EventService {
         Map<Long, UserDtoOut> usersMap = userClient.getUsersByIds(userIds).stream()
                 .collect(Collectors.toMap(UserDtoOut::getId, u -> u));
 
-        Map<Long, Integer> confirmedRequestsMap = getSafeConfirmedRequestsCounts(eventIds);
+        Map<Long, Integer> confirmedRequestsMap = requestClient.getConfirmedRequestsCounts(eventIds);
 
         return events.stream()
                 .map(event -> {
@@ -669,7 +615,7 @@ public class EventServiceImpl implements EventService {
             return requestClient.getConfirmedRequestsCount(eventId);
         } catch (Exception e) {
             log.warn("Request service unavailable for event {}, returning 0: {}", eventId, e.getMessage());
-            return 0;
+            return 0; // возвращаем 0 при недоступности
         }
     }
 
@@ -678,7 +624,8 @@ public class EventServiceImpl implements EventService {
             return requestClient.getConfirmedRequestsCounts(eventIds);
         } catch (Exception e) {
             log.warn("Request service unavailable, returning 0 for all events: {}", e.getMessage());
-            return eventIds.stream().collect(Collectors.toMap(id -> id, id -> 0));
+            // возвращаем 0 для всех событий
+            return eventIds.stream().collect(java.util.stream.Collectors.toMap(id -> id, id -> 0));
         }
     }
 
@@ -688,7 +635,7 @@ public class EventServiceImpl implements EventService {
             return count != null ? count : 0L;
         } catch (Exception e) {
             log.warn("Comment service unavailable for event {}, returning 0: {}", eventId, e.getMessage());
-            return 0L;
+            return 0L; // возвращаем 0 комментариев
         }
     }
 

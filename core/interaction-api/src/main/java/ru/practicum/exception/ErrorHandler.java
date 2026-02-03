@@ -35,7 +35,7 @@ public class ErrorHandler {
 
         return ErrorResponse.builder()
                 .message(errorMessage)
-                .status(HttpStatus.BAD_REQUEST) // Исправлено с METHOD_NOT_ALLOWED на BAD_REQUEST
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
                 .reason("Method argument is not valid.")
                 .timestamp(LocalDateTime.now())
                 .build();
@@ -90,7 +90,7 @@ public class ErrorHandler {
     public ErrorResponse handleConstraintViolationException(ConstraintViolationException ex) {
         return ErrorResponse.builder()
                 .message(ex.getMessage())
-                .status(HttpStatus.BAD_REQUEST) // Исправлено с CONFLICT на BAD_REQUEST
+                .status(HttpStatus.CONFLICT)
                 .reason("Constraint violation")
                 .timestamp(LocalDateTime.now())
                 .build();
@@ -119,22 +119,10 @@ public class ErrorHandler {
                 .build();
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleIllegalArgumentException(final IllegalArgumentException e) {
-        log.warn("400 {}", e.getMessage());
-        return ErrorResponse.builder()
-                .message(e.getMessage())
-                .reason("Invalid argument.")
-                .status(HttpStatus.BAD_REQUEST)
-                .timestamp(LocalDateTime.now())
-                .build();
-    }
-
     @ExceptionHandler
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleException(final Exception e) {
-        log.error("Error 500 {}", e.getMessage(), e);
+        log.warn("Error 500 {}", e.getMessage(), e);
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
         e.printStackTrace(pw);
