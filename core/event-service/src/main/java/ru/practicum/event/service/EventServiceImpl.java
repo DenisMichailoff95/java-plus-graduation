@@ -224,6 +224,26 @@ public class EventServiceImpl implements EventService {
         Specification<Event> spec = buildSpecification(filter);
         List<Event> events = eventRepository.findAll(spec, filter.getPageable()).getContent();
 
+        // Применяем фильтр onlyAvailable на уровне сервиса
+        if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
+            List<Long> eventIds = events.stream()
+                    .map(Event::getId)
+                    .toList();
+
+            Map<Long, Integer> confirmedRequestsMap = getSafeConfirmedRequestsCounts(eventIds);
+
+            events = events.stream()
+                    .filter(event -> {
+                        int participantLimit = event.getParticipantLimit();
+                        if (participantLimit == 0) {
+                            return true; // нет ограничения
+                        }
+                        int confirmed = confirmedRequestsMap.getOrDefault(event.getId(), 0);
+                        return confirmed < participantLimit;
+                    })
+                    .toList();
+        }
+
         enrichEventsWithRatings(events);
 
         return enrichShortEventsWithExternalData(events);
