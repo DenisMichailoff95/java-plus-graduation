@@ -58,9 +58,8 @@ public class EventSpecifications {
     }
 
     public static Specification<Event> withOnlyAvailable(Boolean onlyAvailable) {
-        // Этот метод больше не используется для фильтрации
         // Фильтрация "только доступные" теперь выполняется на уровне сервиса
-        // Возвращаем null, чтобы не применять фильтр в спецификации
+        // Возвращаем null, чтобы не применять в спецификации
         return null;
     }
 

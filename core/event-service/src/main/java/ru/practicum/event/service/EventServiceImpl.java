@@ -222,19 +222,32 @@ public class EventServiceImpl implements EventService {
     @Override
     public List<EventShortDtoOut> findShortEventsBy(EventFilter filter) {
         Specification<Event> spec = buildSpecification(filter);
-        List<Event> events = eventRepository.findAll(spec, filter.getPageable()).getContent();
 
-        enrichEventsWithRatings(events);
+        // Получаем ВСЕ события без пагинации сначала
+        // Потому что нам нужно применить фильтрацию "только доступные" до пагинации
+        List<Event> allEvents = eventRepository.findAll(spec);
 
+        if (allEvents.isEmpty()) {
+            return List.of();
+        }
 
-        List<EventShortDtoOut> result = enrichShortEventsWithExternalData(events);
+        enrichEventsWithRatings(allEvents);
 
-        // Фильтрация "только доступные" на уровне сервиса
+        // Получаем participantLimit для всех событий
+        Map<Long, Integer> participantLimitMap = allEvents.stream()
+                .collect(Collectors.toMap(
+                        Event::getId,
+                        Event::getParticipantLimit
+                ));
+
+        // Обогащаем данные
+        List<EventShortDtoOut> result = enrichShortEventsWithExternalData(allEvents);
+
+        // Применяем фильтрацию "только доступные" если нужно
         if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
             result = result.stream()
                     .filter(event -> {
-                        // Получаем participantLimit из оригинального события
-                        Integer participantLimit = getParticipantLimitForEvent(event.getId());
+                        Integer participantLimit = participantLimitMap.get(event.getId());
                         Integer confirmedRequests = event.getConfirmedRequests();
 
                         // Если лимит не задан (0) или null, событие доступно
@@ -248,25 +261,22 @@ public class EventServiceImpl implements EventService {
                     .collect(Collectors.toList());
         }
 
-        // Применяем пагинацию после фильтрации
-        return applyPagination(result, filter.getFrom(), filter.getSize());
-    }
-
-    private Integer getParticipantLimitForEvent(Long eventId) {
-        return eventRepository.findParticipantLimitById(eventId);
-    }
-
-    private List<EventShortDtoOut> applyPagination(List<EventShortDtoOut> events, int from, int size) {
-        if (events.isEmpty()) {
-            return events;
+        // Применяем сортировку
+        if ("EVENT_DATE".equals(filter.getSort())) {
+            result.sort((e1, e2) -> e2.getEventDate().compareTo(e1.getEventDate()));
         }
+        // Можно добавить другие виды сортировки при необходимости
 
-        int toIndex = Math.min(from + size, events.size());
-        if (from >= events.size()) {
+        // Применяем пагинацию ПОСЛЕ фильтрации
+        int from = filter.getFrom();
+        int size = filter.getSize();
+        int toIndex = Math.min(from + size, result.size());
+
+        if (from >= result.size()) {
             return List.of();
         }
 
-        return events.subList(from, toIndex);
+        return result.subList(from, toIndex);
     }
 
     @Override
@@ -490,7 +500,7 @@ public class EventServiceImpl implements EventService {
                         optionalSpec(EventSpecifications.withCategoriesIn(filter.getCategories())),
                         optionalSpec(EventSpecifications.withPaid(filter.getPaid())),
                         optionalSpec(EventSpecifications.withState(filter.getState())),
-                        // Убрали вызов withOnlyAvailable из спецификаций, т.к. фильтрация теперь на уровне сервиса
+                        optionalSpec(EventSpecifications.withOnlyAvailable(filter.getOnlyAvailable())),
                         optionalSpec(EventSpecifications.withRangeStart(filter.getRangeStart())),
                         optionalSpec(EventSpecifications.withRangeEnd(filter.getRangeEnd()))
                 )
@@ -528,7 +538,7 @@ public class EventServiceImpl implements EventService {
         Map<Long, UserDtoOut> usersMap = userClient.getUsersByIds(userIds).stream()
                 .collect(Collectors.toMap(UserDtoOut::getId, u -> u));
 
-        Map<Long, Integer> confirmedRequestsMap = requestClient.getConfirmedRequestsCounts(eventIds);
+        Map<Long, Integer> confirmedRequestsMap = getSafeConfirmedRequestsCounts(eventIds);
 
         return events.stream()
                 .map(event -> {
@@ -655,7 +665,7 @@ public class EventServiceImpl implements EventService {
             return requestClient.getConfirmedRequestsCount(eventId);
         } catch (Exception e) {
             log.warn("Request service unavailable for event {}, returning 0: {}", eventId, e.getMessage());
-            return 0; // возвращаем 0 при недоступности
+            return 0;
         }
     }
 
@@ -664,8 +674,7 @@ public class EventServiceImpl implements EventService {
             return requestClient.getConfirmedRequestsCounts(eventIds);
         } catch (Exception e) {
             log.warn("Request service unavailable, returning 0 for all events: {}", e.getMessage());
-            // возвращаем 0 для всех событий
-            return eventIds.stream().collect(java.util.stream.Collectors.toMap(id -> id, id -> 0));
+            return eventIds.stream().collect(Collectors.toMap(id -> id, id -> 0));
         }
     }
 
@@ -675,7 +684,7 @@ public class EventServiceImpl implements EventService {
             return count != null ? count : 0L;
         } catch (Exception e) {
             log.warn("Comment service unavailable for event {}, returning 0: {}", eventId, e.getMessage());
-            return 0L; // возвращаем 0 комментариев
+            return 0L;
         }
     }
 
