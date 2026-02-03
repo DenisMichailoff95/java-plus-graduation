@@ -45,7 +45,7 @@ public class EventFilter {
     private Integer from = 0;
 
     @Builder.Default
-    private Integer size = 10;
+    private Integer size = 10;  // Убедитесь, что есть дефолтное значение
 
     private Pageable pageable;
 
@@ -54,9 +54,9 @@ public class EventFilter {
 
     public Pageable getPageable() {
         if (pageable == null) {
-            Sort sort = Sort.by(Sort.Direction.DESC,
+            Sort sortObj = Sort.by(Sort.Direction.DESC,
                     this.sort.equals("VIEWS") ? "views" : "eventDate");
-            this.pageable = PageRequest.of(from / size, size, sort);
+            this.pageable = PageRequest.of(from / size, size, sortObj);
         }
         return pageable;
     }

@@ -223,60 +223,64 @@ public class EventServiceImpl implements EventService {
     public List<EventShortDtoOut> findShortEventsBy(EventFilter filter) {
         Specification<Event> spec = buildSpecification(filter);
 
-        // Получаем ВСЕ события без пагинации сначала
-        // Потому что нам нужно применить фильтрацию "только доступные" до пагинации
-        List<Event> allEvents = eventRepository.findAll(spec);
+        try {
+            // Получаем ВСЕ события без пагинации сначала
+            List<Event> allEvents = eventRepository.findAll(spec);
 
-        if (allEvents.isEmpty()) {
-            return List.of();
+            if (allEvents.isEmpty()) {
+                return List.of();
+            }
+
+            enrichEventsWithRatings(allEvents);
+
+            // Получаем participantLimit для всех событий
+            Map<Long, Integer> participantLimitMap = allEvents.stream()
+                    .collect(Collectors.toMap(
+                            Event::getId,
+                            Event::getParticipantLimit
+                    ));
+
+            // Обогащаем данные
+            List<EventShortDtoOut> result = enrichShortEventsWithExternalData(allEvents);
+
+            // Применяем фильтрацию "только доступные" если нужно
+            if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
+                result = result.stream()
+                        .filter(event -> {
+                            Integer participantLimit = participantLimitMap.get(event.getId());
+                            Integer confirmedRequests = event.getConfirmedRequests();
+
+                            // Если лимит не задан (0) или null, событие доступно
+                            if (participantLimit == null || participantLimit == 0) {
+                                return true;
+                            }
+
+                            // Проверяем, есть ли свободные места
+                            return confirmedRequests < participantLimit;
+                        })
+                        .collect(Collectors.toList());
+            }
+
+            // Применяем сортировку
+            if ("EVENT_DATE".equals(filter.getSort())) {
+                result.sort((e1, e2) -> e2.getEventDate().compareTo(e1.getEventDate()));
+            }
+            // Можно добавить другие виды сортировки при необходимости
+
+            // Применяем пагинацию ПОСЛЕ фильтрации
+            int from = filter.getFrom() != null ? filter.getFrom() : 0;
+            int size = filter.getSize() != null ? filter.getSize() : 10;
+            int toIndex = Math.min(from + size, result.size());
+
+            if (from >= result.size()) {
+                return List.of();
+            }
+
+            return result.subList(from, toIndex);
+        } catch (Exception e) {
+            log.error("Error in findShortEventsBy: {}", e.getMessage(), e);
+            throw e; // Пробрасываем исключение дальше для корректной обработки
         }
-
-        enrichEventsWithRatings(allEvents);
-
-        // Получаем participantLimit для всех событий
-        Map<Long, Integer> participantLimitMap = allEvents.stream()
-                .collect(Collectors.toMap(
-                        Event::getId,
-                        Event::getParticipantLimit
-                ));
-
-        // Обогащаем данные
-        List<EventShortDtoOut> result = enrichShortEventsWithExternalData(allEvents);
-
-        // Применяем фильтрацию "только доступные" если нужно
-        if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
-            result = result.stream()
-                    .filter(event -> {
-                        Integer participantLimit = participantLimitMap.get(event.getId());
-                        Integer confirmedRequests = event.getConfirmedRequests();
-
-                        // Если лимит не задан (0) или null, событие доступно
-                        if (participantLimit == null || participantLimit == 0) {
-                            return true;
-                        }
-
-                        // Проверяем, есть ли свободные места
-                        return confirmedRequests < participantLimit;
-                    })
-                    .collect(Collectors.toList());
-        }
-
-        // Применяем сортировку
-        if ("EVENT_DATE".equals(filter.getSort())) {
-            result.sort((e1, e2) -> e2.getEventDate().compareTo(e1.getEventDate()));
-        }
-        // Можно добавить другие виды сортировки при необходимости
-
-        // Применяем пагинацию ПОСЛЕ фильтрации
-        int from = filter.getFrom();
-        int size = filter.getSize();
-        int toIndex = Math.min(from + size, result.size());
-
-        if (from >= result.size()) {
-            return List.of();
-        }
-
-        return result.subList(from, toIndex);
     }
 
     @Override
