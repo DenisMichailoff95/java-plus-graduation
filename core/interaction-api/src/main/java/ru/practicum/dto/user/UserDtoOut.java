@@ -12,7 +12,12 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class UserDtoOut {
-    private Long id;
-    private String name;
-    private String email;
+    @Builder.Default
+    private Long id = 0L;
+
+    @Builder.Default
+    private String name = "";
+
+    @Builder.Default
+    private String email = "";
 }

@@ -1,0 +1,30 @@
+{
+  "namespace": "ru.practicum.ewm.stats.avro",
+  "type": "record",
+  "name": "UserActionAvro",
+  "fields": [
+    {
+      "name": "user_id",
+      "type": "long"
+    },
+    {
+      "name": "event_id",
+      "type": "long"
+    },
+    {
+      "name": "action_type",
+      "type": {
+        "type": "enum",
+        "name": "ActionTypeAvro",
+        "symbols": ["VIEW", "REGISTER", "LIKE"]
+      }
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}

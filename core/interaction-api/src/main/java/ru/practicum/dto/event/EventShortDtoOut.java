@@ -30,8 +30,10 @@ public class EventShortDtoOut {
     private LocalDateTime eventDate;
 
     private Boolean paid;
-    private Integer confirmedRequests;
 
     @Builder.Default
-    private Long views = 0L;
+    private Integer confirmedRequests = 0;
+
+    @Builder.Default
+    private Double rating = 0.0;
 }

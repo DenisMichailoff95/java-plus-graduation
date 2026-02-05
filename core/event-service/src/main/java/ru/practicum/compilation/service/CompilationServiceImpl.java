@@ -18,7 +18,10 @@ import ru.practicum.dto.event.EventShortDtoOut;
 import ru.practicum.exception.ConditionNotMetException;
 import ru.practicum.exception.NotFoundException;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
 
 @Slf4j
 @Service
@@ -28,6 +31,7 @@ public class CompilationServiceImpl implements CompilationService {
 
     private final CompilationRepository compilationRepository;
     private final EventClient eventClient;
+    private final CompilationMapper compilationMapper;
 
     @Override
     public List<CompilationDto> getCompilations(Boolean pinned, int from, int size) {
@@ -58,7 +62,7 @@ public class CompilationServiceImpl implements CompilationService {
             throw new ConditionNotMetException("A compilation with this title already exists");
         }
 
-        Compilation compilation = CompilationMapper.toEntity(newCompilationDto);
+        Compilation compilation = compilationMapper.toEntity(newCompilationDto);
         Compilation saved = compilationRepository.save(compilation);
         return enrichCompilationWithEvents(saved);
     }
@@ -94,7 +98,7 @@ public class CompilationServiceImpl implements CompilationService {
     }
 
     private CompilationDto enrichCompilationWithEvents(Compilation compilation) {
-        CompilationDto dto = CompilationMapper.toDto(compilation);
+        CompilationDto dto = compilationMapper.toDto(compilation);
 
         if (compilation.getEventIds() != null && !compilation.getEventIds().isEmpty()) {
             try {

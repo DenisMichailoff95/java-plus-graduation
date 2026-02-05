@@ -6,12 +6,22 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import ru.practicum.dto.event.EventCreateDto;
 import ru.practicum.dto.event.EventDtoOut;
 import ru.practicum.dto.event.EventShortDtoOut;
 import ru.practicum.dto.event.EventUpdateDto;
 import ru.practicum.event.service.EventService;
+import ru.practicum.statsclient.client.CollectorClient;
 
 import java.util.List;
 
@@ -23,6 +33,7 @@ import java.util.List;
 public class PrivateEventController {
 
     private final EventService eventService;
+    private final CollectorClient collectorClient;
 
     @GetMapping("/{userId}/events")
     public List<EventShortDtoOut> getEventsCreatedByUser(
@@ -56,5 +67,13 @@ public class PrivateEventController {
                                     @PathVariable @Min(1) Long eventId) {
         log.info("запрос : получить событие: {}", eventId);
         return eventService.find(userId, eventId);
+    }
+
+    @PutMapping("/{userId}/events/{eventId}/like")
+    @ResponseStatus(HttpStatus.OK)
+    public void likeEvent(@PathVariable @Min(1) Long userId,
+                          @PathVariable @Min(1) Long eventId) {
+        log.info("User {} likes event {}", userId, eventId);
+        eventService.sendLikeAction(userId, eventId);
     }
 }

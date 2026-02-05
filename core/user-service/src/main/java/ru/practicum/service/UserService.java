@@ -17,7 +17,7 @@ public interface UserService {
 
     Boolean checkUserExists(Long userId);
 
-    List<Boolean> checkUsersExist(List<Long> userIds);
+    List<Boolean> checkUsersExist(List<Long> userIds); // ← Новый метод
 
     List<UserDtoOut> getUsersByIds(List<Long> ids);
 }

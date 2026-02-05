@@ -58,10 +58,12 @@ public class EventSpecifications {
     }
 
     public static Specification<Event> withOnlyAvailable(Boolean onlyAvailable) {
-        // Этот метод больше не используется для фильтрации
-        // Фильтрация "только доступные" теперь выполняется на уровне сервиса
-        // Возвращаем null, чтобы не применять фильтр в спецификации
-        return null;
+        if (onlyAvailable == null || !onlyAvailable) {
+            return null;
+        }
+        // Фильтрация по доступности будет выполнена на уровне сервиса,
+        // так как информация о confirmedRequests находится в другом микросервисе
+        return (root, query, cb) -> cb.conjunction();
     }
 
     public static Specification<Event> withRangeStart(LocalDateTime rangeStart) {

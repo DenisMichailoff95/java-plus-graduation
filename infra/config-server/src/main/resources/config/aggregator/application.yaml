@@ -1,0 +1,9 @@
+kafka:
+  settings:
+    url: "localhost:9092"
+    action: "stats.user-actions.v1"
+    similarity: "stats.events-similarity.v1"
+
+logging:
+  level:
+    ru.practicum: DEBUG
